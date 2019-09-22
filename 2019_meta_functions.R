@@ -22,7 +22,7 @@ cohen_d_between = function(outcome, categ, for_table = T){
   print(stats)
 }
 
-get_bf_info = function(dat_guilt, dat_innocent, study, study_num) {
+get_sd_info = function(dat_guilt, dat_innocent, study, study_num) {
     #t = t.test(dat_guilt, dat_innocent)$statistic
     n_g = length(dat_guilt)
     n_i = length(dat_innocent)
@@ -105,7 +105,10 @@ dat_prep = function(id,
         ungroup() %>% # here I undo the grouping because in the next line I wanna start a new grouping
 
         group_by (id, stim) %>% # here I calculate means value per stimuli
-        mutate(mean_stim = c(mean(rt), rep(NA, length(rt) - 1))) %>%
+        mutate(mean_stim =
+                   ifelse(type %in% c("probe", "irrelevant"), c(mean(rt), rep(NA, length(
+                       rt
+                   ) - 1)), NA)) %>%
         ungroup() %>%
         group_by(id) %>%
         mutate(
@@ -114,7 +117,17 @@ dat_prep = function(id,
             sd_irr_stim = sd(mean_stim[type == "irrelevant"], na.rm = TRUE),
             d_cit_perstim = (mean_probe_stim-mean_irr_stim)/sd_irr_stim,
             mean_stim_scaled = scale(mean_stim),
-            p_i_diff_perstim_scaled = mean(mean_stim_scaled[type == "probe"], na.rm = TRUE) - mean(mean_stim_scaled[type == "irrelevant"], na.rm = TRUE)
+            p_i_diff_perstim_scaled = mean(mean_stim_scaled[type == "probe"], na.rm = TRUE),
+
+            rt_probe = mean(rt[type == "probe"]),
+            rt_irr = mean(rt[type == "irrelevant"]),
+            # SDs
+            sd_irr_trials = sd(rt[type == "irrelevant"]),
+            sd_pooled_trials = sd_pooled(rt[type == "probe"], rt[type == "irrelevant"]),
+            # scaled RTs
+            rt_notarg = ifelse(type %in% c("probe", "irrelevant"), rt, NA),
+            rt_scaled_trials = scale(rt_notarg),
+            rt_probe_scaled = mean(rt_scaled_trials[type == "probe"])
         ) %>%
         ungroup() %>%
 
@@ -123,17 +136,6 @@ dat_prep = function(id,
 
         select(-c(stim, type)) %>% # we drop the stim and type columns because we wanna average over it, and im dropping the charachter variables cause I'm throwing a mean over everything
         group_by(id) %>%
-        mutate(
-            rt_probe = mean(rt[type == "probe"]),
-            rt_irr = mean(rt[type == "irrelevant"]),
-            # SDs
-            sd_irr_trials = sd(rt[type == "irrelevant"]),
-            sd_pooled_trials = sd_pooled(rt[type == "probe"], rt[type == "irrelevant"]),
-            # scaled RTs
-            rt_scaled_trials = scale(rt),
-            rt_probe_scaled = mean(rt_scaled_trials[type == "probe"]),
-            rt_irr_scaled = mean(rt_scaled_trials[type == "irrelevant"])
-        ) %>%
 
         summarise_all(funs(ifelse((is.numeric(.)), mean(., na.rm = TRUE), first(.)
         ))) %>% # aggregrate
@@ -141,7 +143,7 @@ dat_prep = function(id,
                 probe_irrelevant_diff = rt_probe - rt_irr,
                 d_cit = (rt_probe - rt_irr) / sd_irr_trials,
                 d_cit_pooled = (rt_probe - rt_irr) / sd_pooled_trials,
-                p_i_diff_pertrial_scaled = rt_probe_scaled - rt_irr_scaled
+                p_i_diff_pertrial_scaled = rt_probe_scaled
             ) %>% # create the difference scores
         filter(
             acc_type_target > .50 &
@@ -153,35 +155,224 @@ dat_prep = function(id,
 }
 
 
-effectsize_data = function(id,probe_irrelevant_diff,cond,multiple_single,study,sd) {
+effectsize_data = function(id,
+                           probe_irrelevant_diff,
+                           d_cit,
+                           d_cit_pooled,
+                           p_i_diff_pertrial_scaled,
+                           d_cit_perstim,
+                           p_i_diff_perstim_scaled,
+                           cond,
+                           multiple_single,
+                           study,
+                           sd) {
 
-  Data_Real <- tibble (id=id,probe_irrelevant_diff=probe_irrelevant_diff,cond=cond, multiple_single=multiple_single,study=study)
-
-  multiple_single <- ifelse(Data_Real$multiple_single[1] == 1, "multiple", "single")
-  multiple_single <- ifelse(Data_Real$multiple_single[1] == 2, "inducer", multiple_single)
-  study <- Data_Real$study[1]
 
 
-  ## We simulate a normal distribution with the same SD but with a mean of zero.
-  # Then we simulate like what 100.000 observations?
+    Data_Real <-
+        tibble (
+            id = id,
+            probe_irrelevant_diff = probe_irrelevant_diff,
+            d_cit = d_cit,
+            d_cit_pooled = d_cit_pooled,
+            p_i_diff_pertrial_scaled = p_i_diff_pertrial_scaled,
+            d_cit_perstim = d_cit_perstim,
+            p_i_diff_perstim_scaled = p_i_diff_perstim_scaled,
+            cond = cond,
+            multiple_single = multiple_single,
+            study = study
+        )
 
-  # Because of the way the cohens_d works I add them in a data frame with the guilty ones immediately
-  # set.seed(100) # unnecessary; we'll always create perfect normal distributions
-  Data_Sim <- full_join (tibble(cond = 0, probe_irrelevant_diff = bayestestR::distribution_normal(n=10000,  mean=0, sd=sd)),filter(Data_Real,cond == 1))  # multiple
 
-  # compare the guilty with the innocent
+    multiple_single <-
+        ifelse(Data_Real$multiple_single[1] == 1, "multiple", "single")
+    multiple_single <-
+        ifelse(Data_Real$multiple_single[1] == 2,
+               "inducer",
+               multiple_single)
+    study <- Data_Real$study[1]
 
-  d1 <- cohen_d_between(Data_Real$probe_irrelevant_diff,Data_Real$cond) #real
-  # compare the guilty with the stimulated
-  d2 <- cohen_d_between(Data_Sim$probe_irrelevant_diff,Data_Sim$cond) # simulate
 
-  output <- tibble(cohens_d = c (as.numeric(d1[1]), as.numeric(d2[1])),
-                   variance_d = c(as.numeric(d1[2]), as.numeric(d2[2])),
-                   simulated = c ("no", "yes"),
-                   multiple_single = c (multiple_single,multiple_single),
-                   study = c (study,study))
+    ## We simulate a normal distribution with the same SD but with a mean of zero.
+    # Then we simulate like what 100.000 observations?
 
-  return(output)
+    # Because of the way the cohens_d works I add them in a data frame with the guilty ones immediately
+    # set.seed(100) # unnecessary; we'll always create perfect normal distributions
+    Data_Sim <-
+        full_join (
+            tibble(
+                cond = 0,
+                probe_irrelevant_diff = bayestestR::distribution_normal(n = 10000,  mean =
+                                                                            0, sd = sd)
+            ),
+            filter(Data_Real, cond == 1)
+        )  # multiple
+
+    testData_Real <<- Data_Real
+    # Data_Real = testData_Real
+
+    if (add_figs == TRUE) {
+        fig_real = t_neat(
+            Data_Real$probe_irrelevant_diff[Data_Real$cond == 1],
+            Data_Real$probe_irrelevant_diff[Data_Real$cond == 0],
+            plot_densities = TRUE,
+            bf_added = FALSE,
+            auc_added = TRUE,
+            reverse = TRUE,
+            var_names = c("Guilty", "Innocent"),
+            y_label = NULL,
+            x_label = NULL
+        )$density_plot +
+            scale_x_continuous(limits = c(-150, 150),
+                               breaks = seq(-50, 50, by = 50)) +
+            scale_y_continuous(limits = c(0, 0.025))
+        fig_sim = t_neat(
+            Data_Sim$probe_irrelevant_diff[Data_Sim$cond == 1],
+            Data_Sim$probe_irrelevant_diff[Data_Sim$cond == 0],
+            plot_densities = TRUE,
+            bf_added = FALSE,
+            auc_added = TRUE,
+            reverse = TRUE,
+            var_names = c("Guilty", "Innocent"),
+            y_label = NULL,
+            x_label = NULL
+        )$density_plot +
+            scale_x_continuous(limits = c(-150, 150),
+                               breaks = seq(-50, 50, by = 50)) +
+            scale_y_continuous(limits = c(0, 0.023))
+    } else {
+        fig_real = NULL
+        fig_sim = NULL
+    }
+
+    simulated_d <-
+        cohen_d_between(Data_Sim$probe_irrelevant_diff, Data_Sim$cond) # simulate
+
+    p_vs_i_d <-
+        cohen_d_between(Data_Real$probe_irrelevant_diff, Data_Real$cond) #real
+
+    d_cit_d <-
+        cohen_d_between(Data_Real$d_cit, Data_Real$cond) #real
+    d_cit_pooled_d <-
+        cohen_d_between(Data_Real$d_cit_pooled, Data_Real$cond) #real
+    d_cit_perstim_d <-
+        cohen_d_between(Data_Real$d_cit_perstim, Data_Real$cond) #real
+    p_vs_i_scaled_items_d <-
+        cohen_d_between(Data_Real$p_i_diff_perstim_scaled, Data_Real$cond) #real
+    p_vs_i_scaled_trials_d <-
+        cohen_d_between(Data_Real$p_i_diff_pertrial_scaled, Data_Real$cond) #real
+
+
+    simulated_auc = t_neat(
+        Data_Sim$probe_irrelevant_diff[Data_Sim$cond == 1],
+        Data_Sim$probe_irrelevant_diff[Data_Sim$cond == 0],
+        auc_added = TRUE,
+        bf_added = FALSE
+    )
+
+    p_vs_i_auc = t_neat(
+        Data_Real$probe_irrelevant_diff[Data_Real$cond == 1],
+        Data_Real$probe_irrelevant_diff[Data_Real$cond == 0],
+        auc_added = TRUE,
+        bf_added = FALSE
+    )
+
+    d_cit_auc = t_neat(
+        Data_Real$d_cit[Data_Real$cond == 1],
+        Data_Real$d_cit[Data_Real$cond == 0],
+        auc_added = TRUE,
+        bf_added = FALSE
+    )
+
+
+    d_cit_pooled_auc = t_neat(
+        Data_Real$d_cit_pooled[Data_Real$cond == 1],
+        Data_Real$d_cit_pooled[Data_Real$cond == 0],
+        auc_added = TRUE,
+        bf_added = FALSE
+    )
+
+
+    p_vs_i_scaled_items_auc = t_neat(
+        Data_Real$p_i_diff_perstim_scaled[Data_Real$cond == 1],
+        Data_Real$p_i_diff_perstim_scaled[Data_Real$cond == 0],
+        auc_added = TRUE,
+        bf_added = FALSE
+    )
+    the_versions = c(
+        "simulated",
+        "p_vs_i",
+        "d_cit",
+        "d_cit_pooled",
+        "d_cit_perstim",
+        "p_vs_i_scaled_items",
+        "p_vs_i_scaled_trials"
+    )
+    output <- list(
+        tibble(
+            cohens_d = c(
+                as.numeric(simulated_d[1]),
+                as.numeric(p_vs_i_d[1]),
+                as.numeric(d_cit_d[1]),
+                as.numeric(d_cit_pooled_d[1]),
+                as.numeric(d_cit_perstim_d[1]),
+                as.numeric(p_vs_i_scaled_items_d[1]),
+                as.numeric(p_vs_i_scaled_trials_d[1])
+            ),
+            variance_d = c(
+                as.numeric(simulated_d[2]),
+                as.numeric(p_vs_i_d[2]),
+                as.numeric(d_cit_d[2]),
+                as.numeric(d_cit_pooled_d[2]),
+                as.numeric(d_cit_perstim_d[2]),
+                as.numeric(p_vs_i_scaled_items_d[2]),
+                as.numeric(p_vs_i_scaled_trials_d[2])
+            ),
+            version = the_versions,
+            multiple_single = rep(multiple_single, length(the_versions)),
+            study = rep(study, length(the_versions)),
+            aucs = c(
+                as.numeric(simulated_auc$stats['auc']),
+                as.numeric(p_vs_i_auc$stats['auc']),
+                as.numeric(d_cit_auc$stats['auc']),
+                as.numeric(d_cit_pooled_auc$stats['auc']),
+                NA,
+                as.numeric(p_vs_i_scaled_items_auc$stats['auc']),
+                NA
+            ),
+            thresholds = c(
+                as.numeric(simulated_auc$best_thresholds['threshold']),
+                as.numeric(p_vs_i_auc$best_thresholds['threshold']),
+                as.numeric(d_cit_auc$best_thresholds['threshold']),
+                as.numeric(d_cit_pooled_auc$best_thresholds['threshold']),
+                NA,
+                as.numeric(p_vs_i_scaled_items_auc$best_thresholds['threshold']),
+                NA
+            ),
+            TNs = c(
+                as.numeric(simulated_auc$best_thresholds['specificity']),
+                as.numeric(p_vs_i_auc$best_thresholds['specificity']),
+                as.numeric(d_cit_auc$best_thresholds['specificity']),
+                as.numeric(d_cit_pooled_auc$best_thresholds['specificity']),
+                NA,
+                as.numeric(p_vs_i_scaled_items_auc$best_thresholds['specificity']),
+                NA
+            ),
+            TPs = c(
+                as.numeric(simulated_auc$best_thresholds['sensitivity']),
+                as.numeric(p_vs_i_auc$best_thresholds['sensitivity']),
+                as.numeric(d_cit_auc$best_thresholds['sensitivity']),
+                as.numeric(d_cit_pooled_auc$best_thresholds['sensitivity']),
+                NA,
+                as.numeric(p_vs_i_scaled_items_auc$best_thresholds['sensitivity']),
+                NA
+            )
+        ),
+        fig_real,
+        fig_sim
+    )
+
+    return(output)
 }
 
 
@@ -189,14 +380,22 @@ effectsize_data = function(id,probe_irrelevant_diff,cond,multiple_single,study,s
 
 roc_data = function(id,probe_irrelevant_diff,cond,multiple_single,study,sd) {
 
-  Data_Real <- tibble (id=id,probe_irrelevant_diff=probe_irrelevant_diff,cond=cond, multiple_single=multiple_single,study=study)
+    Data_Real <-
+        tibble (
+            id = id,
+            probe_irrelevant_diff = probe_irrelevant_diff,
+            cond = cond,
+            multiple_single = multiple_single,
+            study = study
+        )
 
-  study <- Data_Real$study[1]
-  multiple_single <- ifelse(Data_Real$multiple_single[1] == 1, "multiple", "single")
+    study <- Data_Real$study[1]
+    multiple_single <-
+        ifelse(Data_Real$multiple_single[1] == 1, "multiple", "single")
 
 
-  # make the real roc
-  r1 <- roc(Data_Real$cond,Data_Real$probe_irrelevant_diff)
+    # make the real roc
+    r1 <- roc(Data_Real$cond, Data_Real$probe_irrelevant_diff)
 
   #save in a data frame
   r1_w <-  tibble( TP = r1$sensitivities,
@@ -207,7 +406,15 @@ roc_data = function(id,probe_irrelevant_diff,cond,multiple_single,study,sd) {
 
   #make simulated data
   #set.seed(100)
-  Data_Sim <- full_join(tibble(cond = 0, probe_irrelevant_diff = bayestestR::distribution_normal(n=10000,  mean=0, sd=sd)), filter(Data_Real,cond == 1))
+  Data_Sim <-
+      full_join(
+          tibble(
+              cond = 0,
+              probe_irrelevant_diff = bayestestR::distribution_normal(n = 10000,  mean =
+                                                                          0, sd = sd)
+          ),
+          filter(Data_Real, cond == 1)
+      )
 
   # roc over simulated data
   r2 <- roc(Data_Sim$cond,Data_Sim$probe_irrelevant_diff)
@@ -218,6 +425,7 @@ roc_data = function(id,probe_irrelevant_diff,cond,multiple_single,study,sd) {
                    FN = (1- r2$sensitivities),
                    TN = r2$specificities,
                    simulated = "yes")
+
 
   # join the data together
   roc_metdat <- full_join(r1_w,r2_w)

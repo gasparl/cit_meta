@@ -19,6 +19,9 @@ library(BayesFactor)
 library(pROC)
 library(neatStats)
 
+add_figs = TRUE # takes time
+add_figs = FALSE
+
 # Set working directory
 setwd(path_neat())
 
@@ -52,35 +55,60 @@ Data_KV22 <- read_tsv("rawdata_Exp2.txt")
 #this one has multiple and sinle probes
 # We want to seperate the files one for single and one for multiple probes
 Data_VKT <- Data_VKT %>%
-            mutate(multiple_single = ifelse(cond <2, 1, 0), # 1 = multiple, 0 = single
-                   cond = ifelse(is.even(cond), 1,0 ), # here we set 0 & 2 to guilty (=1) and 1 & 3 to innocent (=0),
-                   study = "Verschuere, Kleinberg, & Theocharidou (2015)",
-                   dataset = ifelse(multiple_single==0, "dataset 1", "dataset 2"))
+    mutate(
+        multiple_single = ifelse(cond < 2, 1, 0),
+        # 1 = multiple, 0 = single
+        cond = ifelse(is.even(cond), 1, 0),
+        # here we set 0 & 2 to guilty (=1) and 1 & 3 to innocent (=0),
+        study = ifelse(
+            multiple_single == 0,
+            "Verschuere, Kleinberg, & Theocharidou (2015) SP",
+            "Verschuere, Kleinberg, & Theocharidou (2015) MP"
+        ),
+        dataset = ifelse(multiple_single == 0, "dataset 11", "dataset 10")
+    )
 
 
 Data_KV1 <- Data_KV1 %>%
             mutate(multiple_single = 1, # 1 = multiple, 0 = single
             study = "Kleinberg & Verschuere (2015) Study 1",
-            dataset = "dataset 3",
+            dataset = "dataset 1",
             cohd = as.numeric(cohd)) #for some reason cohens d is a charachter here which leads to issues with joining
 
 Data_KV2 <- Data_KV2 %>%
              mutate(multiple_single = 1, # 1 = multiple, 0 = single
              study = "Kleinberg & Verschuere (2015) Study 2",
-             dataset = "dataset 4")
+             dataset = "dataset 2")
 
 Data_VK <- Data_VK %>%
            mutate(multiple_single = 1, # 1 = multiple, 0 = single
+           stim = paste(cat, type, sep = "_"),
            study = "Verschuere & Kleinberg (2015)",
-           dataset = "dataset 5")
+           dataset = "dataset 9")
 
 Data_LKV <- Data_LKV %>%
-            mutate(multiple_single = ifelse(cond == 1 | cond == 4, 1, 0), # 1 = multiple, 0 = single
-                   multiple_single = ifelse(cond == 2 | cond == 5, 2, multiple_single), # 2 means inducer
-                   cond = ifelse(cond <3, 1, 0 ), # here we set 0, 1, 2 to guilty (=1) and 3, 4, 5 to innocent (=0),
-                   study = "Lukács, Kleinberg, & Verschuere (2017)",
-                   dataset = ifelse(multiple_single==0, "dataset 6", "dataset 7"),
-                   dataset = ifelse(multiple_single==2,"dataset 8", dataset))
+    mutate(
+        multiple_single = ifelse(cond == 1 |
+                                     cond == 4, 1, 0),
+        # 1 = multiple, 0 = single
+        multiple_single = ifelse(cond == 2 |
+                                     cond == 5, 2, multiple_single),
+        # 2 means inducer
+        cond = ifelse(cond < 3, 1, 0),
+        # here we set 0, 1, 2 to guilty (=1) and 3, 4, 5 to innocent (=0),
+        study = ifelse(
+            multiple_single == 0,
+            "Lukács, Kleinberg, & Verschuere (2017) SP",
+            "Lukács, Kleinberg, & Verschuere (2017) MP"
+        ),
+        study = ifelse(
+            multiple_single == 2,
+            "Lukács, Kleinberg, & Verschuere (2017) SPF",
+            study
+        ),
+        dataset = ifelse(multiple_single == 0, "dataset 6", "dataset 5"),
+        dataset = ifelse(multiple_single == 2, "dataset 7", dataset)
+    )
 
 required_cols = c("id", "date", "cond", "rt", "type", "corr", "multiple_single", "study", "dataset", "age", "gender", "stim", "trial") # this is all the data we need
 
@@ -101,8 +129,7 @@ Data_NV$type[grepl('^target', Data_NV$trialcode)] = "target"
 Data_NV <- Data_NV %>%
     mutate(multiple_single = 1, # 1 = multiple, 0 = single
            study = "Noordraven & Verschuere (2013)",
-           dataset = "dataset 9",
-           stim = stimulusitem1,
+           dataset = "dataset 8",
            trial = as.numeric(trialnum),
            age = 99, # just filler, no need for this now
            gender = 9, # just filler, no need for this now
@@ -116,7 +143,7 @@ Data_KV21 <- Data_KV21 %>%
     mutate(multiple_single = 1, # 1 = multiple, 0 = single
            cond = ifelse(cond == 1, 0, 1 ), # here we set 0 & 2 to guilty (=1) and 1 to innocent (=0),
            study = "Kleinberg & Verschuere (2016) Study 1",
-           dataset = "dataset 10")
+           dataset = "dataset 3")
 Data_KV21 = Data_KV21[,required_cols]
 
 Data_KV22$trial = as.numeric(seq(nrow(Data_KV22))) # has no trial column, so i create it artificially
@@ -125,7 +152,7 @@ Data_KV22 <- Data_KV22 %>%
            cond = ifelse(cond == 0, 0, 1 ), # here we set 1 & 2 & 3 to guilty (=1) and 0 to innocent (remains 0), ,
            id = paste0(date, age, lang, cohd), # for some reason it has no ids; so i create one
            study = "Kleinberg & Verschuere (2016) Study 2",
-           dataset = "dataset 11")
+           dataset = "dataset 4")
 Data_KV22 = Data_KV22[,required_cols]
 
 # join them all together
@@ -141,24 +168,29 @@ Data_joined$id = as.character(Data_joined$id) # gotto convert it because last on
 Data_joined <- full_join(Data_joined, select(Data_KV22,-date)) # date problem again
 
 # now we loop through the Data
+set.seed(100)
 metdat <- tibble()
 roc_metdat <- tibble()
 study_prev <- "none"
 sd_prev <- 0
 count <- 0
+l_fig_real = list()
+l_fig_sim = list()
 
-for (i in unique(Data_joined$dataset)) {
-    # i = "dataset 8" # filler
+dsets = unique(Data_joined$dataset)
+for (i in dsets[order(nchar(dsets), dsets)]) {
+    # i = "dataset 7" # filler
+    # i = "dataset 5"
   dat_i <- filter(Data_joined, dataset == i) # select the current data set
 
   study_i <- dat_i$study[1]
   print("-----------------------")
+  cat(i, " ")
   print(study_i)
 
   #prep the data
   dat_i_prep <- dat_prep(dat_i$id,dat_i$gender,dat_i$age,dat_i$stim,dat_i$trial,
             dat_i$cond,dat_i$rt,dat_i$corr,dat_i$type,dat_i$multiple_single,dat_i$study)
-
 
   ## NOTE: predictors listed below
 
@@ -192,25 +224,39 @@ for (i in unique(Data_joined$dataset)) {
   # mean(PROBESmeans) - mean(IRRELEVANTSmeans)
   # dat_i_prep$p_i_diff_perstim_scaled
 
-
   p_i_guilty = filter(dat_i_prep,  cond == 1)$probe_irrelevant_diff
   p_i_innocent = filter(dat_i_prep,  cond == 0)$probe_irrelevant_diff
 
-  sd_met_dat_i = get_bf_info(p_i_guilty, p_i_innocent, study_i, i)
-  #t_neat(p_i_guilty, p_i_innocent, plot_densities = T, )
+  sd_met_dat_i = get_sd_info(p_i_guilty, p_i_innocent, study_i, i)
+  #t_neat(p_i_guilty, p_i_innocent, plot_densities = T, auc_added = T )
 
-  sd_i <- sd(p_i_guilty)
+  p_i_guilty_scaled = filter(dat_i_prep,  cond == 1)$p_i_diff_perstim_scaled
+  p_i_innocent_scaled = filter(dat_i_prep,  cond == 0)$p_i_diff_perstim_scaled
+  sd_scaled_met_dat_i = get_sd_info(p_i_guilty_scaled, p_i_innocent_scaled, study_i, i)
+  #t_neat(p_i_guilty_scaled, p_i_innocent_scaled, plot_densities = T, auc_added = T )
 
-  # Get the cohens d and shit
-  met_dat_i <-
+  sd_i <- sd(p_i_guilty)* 0.5077 + 7.1245
+
+  # Get the cohens d and stuff
+  eff_data <-
       effectsize_data(
           dat_i_prep$id,
           dat_i_prep$probe_irrelevant_diff,
+          dat_i_prep$d_cit,
+          dat_i_prep$d_cit_pooled,
+          dat_i_prep$p_i_diff_pertrial_scaled,
+          dat_i_prep$d_cit_perstim,
+          dat_i_prep$p_i_diff_perstim_scaled,
           dat_i_prep$cond,
           dat_i_prep$multiple_single,
           dat_i_prep$study,
           sd_i
       )
+
+  met_dat_i = eff_data[[1]]
+  datnum = as.numeric(strsplit(i, split = " ", fixed = TRUE)[[1]][2])
+  l_fig_real[[datnum]] = eff_data[[2]]
+  l_fig_sim[[datnum]] = eff_data[[3]]
 
   # get ROC data
 
@@ -229,17 +275,31 @@ for (i in unique(Data_joined$dataset)) {
       metdat <- rbind(metdat, met_dat_i)
       roc_metdat <- rbind(roc_metdat, roc_met_dat_i)
       sd_metdat <- rbind(sd_metdat, sd_met_dat_i)
+      sd_scaled_metdat = rbind(sd_scaled_metdat, sd_scaled_met_dat_i)
+
   } else
   {
       metdat <- met_dat_i
       roc_metdat <- roc_met_dat_i
       sd_metdat <- sd_met_dat_i
+      sd_scaled_metdat = sd_scaled_met_dat_i
   }
   count = count + 1
 }
 
-stat_dat = sd_metdat[order(as.character(sd_metdat$study)),]
-rownames(stat_dat) = seq(nrow(stat_dat))
+# library("ggpubr")
+# fig_lists = c(l_fig_real, l_fig_sim)
+# bigfig = ggpubr::ggarrange(plotlist = fig_lists, common.legend = TRUE, ncol = 11, nrow = 2)
+# annotate_figure(
+#     bigfig,
+#     top = text_grob("Density plots per each study", face = "bold", size = 14),
+#     bottom = text_grob("probe-irrelevant differences (ms)"),
+#     left = text_grob("density estimate", rot = 90)
+# )
+
+
+stat_dat = sd_metdat
+# stat_dat = sd_scaled_metdat[order(as.character(sd_metdat$study)),]
 
 #stat_dat = stat_dat[stat_dat$study_num != "dataset 9", ]
 corr_neat(stat_dat$sd_g, stat_dat$sd_i)
@@ -252,6 +312,7 @@ model = lm(sd_i~sd_g, data = stat_dat, weights = (stat_dat$n_g+stat_dat$n_i))
 summary(model)
 
 stat_dat$sd_sim2 = stat_dat$sd_g * 0.5077 + 7.1245 # unweighed: 0.4418+8.3898
+stat_dat$sd_sim2 = stat_dat$sd_g * 0.52479 +0.16970
 stat_dat$sd_sim3 = stat_dat$sd_g
 
 t_neat( stat_dat$sd_i, stat_dat$sd_sim2, pair = T )
@@ -272,13 +333,28 @@ ggplot(stat_dat, aes(x = sd_g, y = sd_i, weight = (stat_dat$n_g+stat_dat$n_i) ))
     ylim(0, 50) +
     xlim(0, 50)
 
-met_stat = metdat # this is to easily change the examined variable
-#met_stat = metdat_alt
 
+met_stat = metdat[metdat$version %in% c("p_vs_i","d_cit","d_cit_pooled", "p_vs_i_scaled_items"),]
+met_stat = metdat[metdat$version %in% c("p_vs_i","d_cit"),] # this is to easily change the examined variable
+#met_stat = metdat_alt
 met_stat$study = paste(met_stat$study, met_stat$multiple_single) # to separate studies
 
-mean(met_stat$cohens_d[met_stat$simulated == "no"])
-mean(met_stat$cohens_d[met_stat$simulated == "yes"])
+aggr_neat(metdat, cohens_d, method = "mean+sd", group_by = 'version')
+aggr_neat(metdat, aucs, method = "mean+sd", group_by = 'version')
+
+
+reshape(
+    as.data.frame(met_stat[, c("study", 'version', 'aucs')]),
+    idvar = "study",
+    timevar = "version",
+    direction = "wide"
+)
+thresholds = reshape(
+    as.data.frame(met_stat[, c("study", 'version', 'thresholds')]),
+    idvar = "study",
+    timevar = "version",
+    direction = "wide"
+)
 
 met_stat$crowdsourced = "yes"
 met_stat$crowdsourced[grepl( "Noordraven & Verschuere", met_stat$study )] = "no"
@@ -289,23 +365,47 @@ met_stat$multiple_single[met_stat$multiple_single == "inducer"] = "multiple"
 met_stat$cohens_d <-met_stat$cohens_d *-1
 
 ### fixed-effects model
-REML1 <- rma(cohens_d, variance_d,data=met_stat, method="REML")
+REML1 <- rma(cohens_d, variance_d, data = met_stat, method = "REML")
 REML1
-forest(REML1, slab = met_stat$study, mlab="Summary effect size", xlab = "Effect Size (Cohen's d)")  # plot it
+forest(REML1,
+       slab = met_stat$study,
+       mlab = "Summary effect size",
+       xlab = "Effect Size (Cohen's d)")  # plot it
 # so still al lot of variance left (75%)
 
 # Check for moderators
-REML2 <-rma(cohens_d, variance_d,data=met_stat, method="REML", mods = ~ simulated + multiple_single + crowdsourced)
+REML2 <-
+    rma(
+        cohens_d,
+        variance_d,
+        data = met_stat,
+        method = "REML",
+        mods = ~ version + multiple_single
+    )
 REML2# so in this case you can see that multiple or single probe influences the effect size but not simulated or no
-forest(REML2, slab = met_stat$study,  xlab = "Effect Size (Cohen's d)")  #
+forest(REML2,
+       slab = met_stat$study,
+       mlab = "Summary effect size",
+       xlab = "Effect Size (Cohen's d)")  # plot it
 
 # You can fit it again with just multiple single to show that this can alone explain all variance in effect sizes
 
 # why not control for each study??
 
-REML3 <-rma(cohens_d, variance_d,data=met_stat, method="REML", mods = ~ simulated )
-REML3
-forest(REML3, slab = met_stat$study,  xlab = "Effect Size (Cohen's d)")  #
+
+REML <-
+    rma(
+        cohens_d,
+        variance_d,
+        data = met_stat,
+        method = "REML",
+        mods = ~ version
+    )
+REML
+forest(REML,
+       slab = met_stat$study,
+       mlab = "Summary effect size",
+       xlab = "Effect Size (Cohen's d)")  # plot it
 
 ## ROC
 roc_met = roc_metdat
