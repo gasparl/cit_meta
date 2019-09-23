@@ -36,14 +36,14 @@ source("2019_meta_functions.R")
 
 setwd(path_neat("data"))
 
-Data_VKT <- read_sav("Experiment2_Data_SPSSformat.sav")
-Data_KV1 <- read_sav("MemoryDetection2_0_Study1_rawdata_SPSS.sav")
-Data_KV2 <- read_sav("MemoryDetection2_0_Study2_rawdata_SPSS.sav")
-Data_VK <-  read_sav("rawdata_online-id-check.sav")
-Data_LKV <- read_tsv("Experiment1_data.txt")
-Data_NV <- read_tsv("Oddball Ernst PP 1- 43 FINAL.txt")
-Data_KV21 <- read_tsv("rawdata_Exp1.txt") # 10.1016j.jarmac.2015.11.004
-Data_KV22 <- read_tsv("rawdata_Exp2.txt")
+Data_VKT <- read_sav("Experiment2_Data_SPSSformat.sav") # Verschuere, Kleinberg, & Theocharidou (2015) SP/MP https://osf.io/kgum2/
+Data_KV1 <- read_sav("MemoryDetection2_0_Study1_rawdata_SPSS.sav") # Kleinberg & Verschuere (2015) Study 1 https://osf.io/5htyr/
+Data_KV2 <- read_sav("MemoryDetection2_0_Study2_rawdata_SPSS.sav") # Kleinberg & Verschuere (2015) Study 2 https://osf.io/5htyr/
+Data_VK <-  read_sav("rawdata_online-id-check.sav") # Verschuere & Kleinberg (2015) https://osf.io/cg5es/
+Data_LKV <- read_tsv("Experiment1_data.txt") # Lukács, Kleinberg, & Verschuere (2017) MP/SP/SPF https://osf.io/kv65n/
+Data_NV <- read_tsv("Oddball Ernst PP 1- 43 FINAL.txt") # Noordraven & Verschuere (2013)
+Data_KV21 <- read_tsv("rawdata_Exp1.txt") # Kleinberg & Verschuere (2016) Study 1 https://osf.io/c7w5v/
+Data_KV22 <- read_tsv("rawdata_Exp2.txt") # Kleinberg & Verschuere (2016) Study 2 https://osf.io/c7w5v/
 
 
 ########################
