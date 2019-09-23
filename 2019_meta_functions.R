@@ -22,26 +22,37 @@ cohen_d_between = function(outcome, categ, for_table = T){
   print(stats)
 }
 
-get_sd_info = function(dat_guilt, dat_innocent, study, study_num) {
-    #t = t.test(dat_guilt, dat_innocent)$statistic
-    n_g = length(dat_guilt)
-    n_i = length(dat_innocent)
-    sd_g = sd(dat_guilt)
-    sd_i = sd(dat_innocent)
-    m_g = mean(dat_guilt)
-    m_i = mean(dat_innocent)
-    myrow = data.frame(
-        study = study,
-        study_num = study_num,
-        #t = t,
-        sd_g = sd_g,
-        sd_i = sd_i,
-        n_g = n_g,
-        n_i = n_i,
-        m_g = m_g,
-        m_i = m_i
-    )
-    return(myrow)
+
+get_sd_info = function(fulprep_dat, preds_list, study, study_num) {
+    for (pred_to_get in preds_list) {
+        dat_guilt = filter(fulprep_dat,  cond == 1)[[pred_to_get]]
+        dat_innocent = filter(fulprep_dat,  cond == 0)[[pred_to_get]]
+        #t = t.test(dat_guilt, dat_innocent)$statistic
+        n_g = length(dat_guilt)
+        n_i = length(dat_innocent)
+        sd_g = sd(dat_guilt)
+        sd_i = sd(dat_innocent)
+        m_g = mean(dat_guilt)
+        m_i = mean(dat_innocent)
+        row_x = data.frame(
+            predictor_cit = pred_to_get,
+            study = study,
+            study_num = study_num,
+            #t = t,
+            sd_g = sd_g,
+            sd_i = sd_i,
+            n_g = n_g,
+            n_i = n_i,
+            m_g = m_g,
+            m_i = m_i
+        )
+        if (pred_to_get == preds_list[1]) {
+            sd_rows = row_x
+        } else {
+            sd_rows = rbind(sd_rows, row_x)
+        }
+    }
+    return(sd_rows)
 }
 
 # test: get_bf_info(c(1,2,3,4,23,2),c(1,2,13,24,23,2), "stud", 88)
@@ -338,6 +349,15 @@ effectsize_data = function(id,
                 as.numeric(d_cit_pooled_auc$stats['auc']),
                 NA,
                 as.numeric(p_vs_i_scaled_items_auc$stats['auc']),
+                NA
+            ),
+            accuracies = c(
+                as.numeric(simulated_auc$stats['youden']+1)/2,
+                as.numeric(p_vs_i_auc$stats['youden']+1)/2,
+                as.numeric(d_cit_auc$stats['youden']+1)/2,
+                as.numeric(d_cit_pooled_auc$stats['youden']+1)/2,
+                NA,
+                as.numeric(p_vs_i_scaled_items_auc$stats['youden']+1)/2,
                 NA
             ),
             thresholds = c(

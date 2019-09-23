@@ -166,6 +166,7 @@ Data_joined <- full_join(Data_joined, Data_NV)
 Data_joined <- full_join(Data_joined, select(Data_KV21,-date)) # date problem again
 Data_joined$id = as.character(Data_joined$id) # gotto convert it because last one is char
 Data_joined <- full_join(Data_joined, select(Data_KV22,-date)) # date problem again
+dsets = unique(Data_joined$dataset)
 
 # now we loop through the Data
 set.seed(100)
@@ -177,16 +178,13 @@ count <- 0
 l_fig_real = list()
 l_fig_sim = list()
 
-dsets = unique(Data_joined$dataset)
 for (i in dsets[order(nchar(dsets), dsets)]) {
     # i = "dataset 7" # filler
     # i = "dataset 5"
   dat_i <- filter(Data_joined, dataset == i) # select the current data set
 
   study_i <- dat_i$study[1]
-  print("-----------------------")
-  cat(i, " ")
-  print(study_i)
+  cat("------------ started ", i, ": ", study_i, fill = T)
 
   #prep the data
   dat_i_prep <- dat_prep(dat_i$id,dat_i$gender,dat_i$age,dat_i$stim,dat_i$trial,
@@ -224,16 +222,29 @@ for (i in dsets[order(nchar(dsets), dsets)]) {
   # mean(PROBESmeans) - mean(IRRELEVANTSmeans)
   # dat_i_prep$p_i_diff_perstim_scaled
 
+
   p_i_guilty = filter(dat_i_prep,  cond == 1)$probe_irrelevant_diff
-  p_i_innocent = filter(dat_i_prep,  cond == 0)$probe_irrelevant_diff
 
-  sd_met_dat_i = get_sd_info(p_i_guilty, p_i_innocent, study_i, i)
-  #t_neat(p_i_guilty, p_i_innocent, plot_densities = T, auc_added = T )
+  sd_met_dat_i = get_sd_info(
+      dat_i_prep,
+      c(
+          'probe_irrelevant_diff',
+          'p_i_diff_perstim_scaled',
+          'd_cit_pooled'
+      ),
+      study_i,
+      i
+  )
 
-  p_i_guilty_scaled = filter(dat_i_prep,  cond == 1)$p_i_diff_perstim_scaled
-  p_i_innocent_scaled = filter(dat_i_prep,  cond == 0)$p_i_diff_perstim_scaled
-  sd_scaled_met_dat_i = get_sd_info(p_i_guilty_scaled, p_i_innocent_scaled, study_i, i)
-  #t_neat(p_i_guilty_scaled, p_i_innocent_scaled, plot_densities = T, auc_added = T )
+  preds_met_dat_i = data.frame(
+      study = study_i,
+      dataset = i,
+      p_vs_i = dat_i_prep$probe_irrelevant_diff,
+      p_vs_i_scaled_items = dat_i_prep$p_i_diff_perstim_scaled,
+      d_cit = dat_i_prep$d_cit,
+      d_cit_pooled = dat_i_prep$d_cit_pooled,
+      cond = dat_i_prep$cond
+  )
 
   sd_i <- sd(p_i_guilty)* 0.5077 + 7.1245
 
@@ -275,17 +286,21 @@ for (i in dsets[order(nchar(dsets), dsets)]) {
       metdat <- rbind(metdat, met_dat_i)
       roc_metdat <- rbind(roc_metdat, roc_met_dat_i)
       sd_metdat <- rbind(sd_metdat, sd_met_dat_i)
-      sd_scaled_metdat = rbind(sd_scaled_metdat, sd_scaled_met_dat_i)
+      preds_metdat = rbind(preds_metdat, preds_met_dat_i)
 
   } else
   {
       metdat <- met_dat_i
       roc_metdat <- roc_met_dat_i
       sd_metdat <- sd_met_dat_i
-      sd_scaled_metdat = sd_scaled_met_dat_i
+      preds_metdat = preds_met_dat_i
   }
   count = count + 1
+  cat("finished", i, ": ", study_i, fill = T)
 }
+
+
+## --- FIGURES
 
 # library("ggpubr")
 # fig_lists = c(l_fig_real, l_fig_sim)
@@ -298,8 +313,9 @@ for (i in dsets[order(nchar(dsets), dsets)]) {
 # )
 
 
-stat_dat = sd_metdat
-# stat_dat = sd_scaled_metdat[order(as.character(sd_metdat$study)),]
+## --- Standard Deviations
+
+stat_dat = sd_metdat # [sd_metdat$predictor_cit == "probe_irrelevant_diff",]
 
 #stat_dat = stat_dat[stat_dat$study_num != "dataset 9", ]
 corr_neat(stat_dat$sd_g, stat_dat$sd_i)
@@ -334,14 +350,109 @@ ggplot(stat_dat, aes(x = sd_g, y = sd_i, weight = (stat_dat$n_g+stat_dat$n_i) ))
     xlim(0, 50)
 
 
+## -- Accuracies
+
+accs_cv = NULL
+for (pred_type in c("p_vs_i", "d_cit", "d_cit_pooled", "p_vs_i_scaled_items")) {
+    met_thres = metdat[metdat$version == pred_type, ]
+
+    for (stud in unique(met_thres$study)) {
+        thres_orig = met_thres$thresholds[met_thres$study == stud]
+        thres_mean = mean(met_thres$thresholds[met_thres$study != stud])
+        thres_median = median(met_thres$thresholds[met_thres$study != stud])
+        preds_stud = preds_metdat[preds_metdat$study == stud, ]
+        preds_guilty = preds_stud[[pred_type]][preds_stud$cond == 1]
+        preds_innocent = preds_stud[[pred_type]][preds_stud$cond == 0]
+        tpr = length(preds_guilty[preds_guilty > thres_orig]) / length(preds_guilty)
+        tnr = length(preds_innocent[preds_innocent < thres_orig]) / length(preds_innocent)
+        acc = (tpr + tnr) / 2
+
+        tpr_mean = length(preds_guilty[preds_guilty > thres_mean]) / length(preds_guilty)
+        tnr_mean = length(preds_innocent[preds_innocent < thres_mean]) / length(preds_innocent)
+        acc_mean = (tpr_mean + tnr_mean) / 2
+
+        tpr_med = length(preds_guilty[preds_guilty > thres_median]) / length(preds_guilty)
+        tnr_med = length(preds_innocent[preds_innocent < thres_median]) / length(preds_innocent)
+        acc_med = (tpr_med + tnr_med) / 2
+        new_accs_cv = data.frame(
+            study = stud,
+            version = pred_type,
+            acc_orig = acc,
+            acc_cv_mean = acc_mean,
+            acc_cv_med = acc_med,
+            TPs_orig = tnr,
+            TNs_orig = tpr,
+            TPs_cv = tnr_mean,
+            TNs_cv = tpr_mean,
+            TPs_cv_med = tnr_med,
+            TNs_cv_med = tpr_med
+        )
+        if (is.null(accs_cv)) {
+            accs_cv = new_accs_cv
+        } else {
+            accs_cv = rbind(accs_cv, new_accs_cv)
+        }
+    }
+}
+
+aggr_neat(accs_cv, values = "acc_orig", group_by = c("version"))
+aggr_neat(accs_cv, values = "acc_cv_mean", group_by = c("version"))
+aggr_neat(accs_cv, values = "acc_cv_med", group_by = c("version"))
+
+accs_cv_for_aov = accs_cv
+accs_cv_for_aov$version = as.character(accs_cv_for_aov$version)
+accs_cv_for_aov$version[accs_cv_for_aov$version == 'p_vs_i'] = 'p_vs_i_basic'
+accs_cv_wide = reshape(
+    as.data.frame(accs_cv_for_aov[accs_cv_for_aov$version %in% c("p_vs_i_basic", "d_cit_pooled", "p_vs_i_scaled_items"), c("study", 'version', 'acc_orig', 'acc_cv_mean', 'acc_cv_med')]),
+    idvar = "study",
+    timevar = "version",
+    direction = "wide"
+)
+cat(names(accs_cv_wide), sep = "', '", fill = T)
+
+anova_neat(
+    accs_cv_wide,
+    values = c(
+        'acc_orig.p_vs_i_basic',
+        'acc_cv_mean.p_vs_i_basic',
+        'acc_cv_med.p_vs_i_basic',
+        'acc_orig.d_cit_pooled',
+        'acc_cv_mean.d_cit_pooled',
+        'acc_cv_med.d_cit_pooled',
+        'acc_orig.p_vs_i_scaled_items',
+        'acc_cv_mean.p_vs_i_scaled_items',
+        'acc_cv_med.p_vs_i_scaled_items'
+    ),
+    within_ids = list(
+        acc_type = c('acc_orig', 'acc_cv_mean', 'acc_cv_med'),
+        pred_type = c('p_vs_i_basic', 'd_cit_pooled', 'p_vs_i_scaled_items')
+    )
+)
+
+anova_neat(
+    accs_cv_wide,
+    values = c(
+        'acc_orig.p_vs_i_basic',
+        'acc_cv_mean.p_vs_i_basic',
+        'acc_orig.d_cit_pooled',
+        'acc_cv_mean.d_cit_pooled',
+        'acc_orig.p_vs_i_scaled_items',
+        'acc_cv_mean.p_vs_i_scaled_items'
+    ),
+    within_ids = list(
+        acc_type = c('acc_orig', 'acc_cv_mean'),
+        pred_type = c('p_vs_i_basic', 'd_cit_pooled', 'p_vs_i_scaled_items')
+    )
+)
+
+
+## -- Meta-analysis
+
 met_stat = metdat[metdat$version %in% c("p_vs_i","d_cit","d_cit_pooled", "p_vs_i_scaled_items"),]
 met_stat = metdat[metdat$version %in% c("p_vs_i","d_cit"),] # this is to easily change the examined variable
-#met_stat = metdat_alt
-met_stat$study = paste(met_stat$study, met_stat$multiple_single) # to separate studies
 
 aggr_neat(metdat, cohens_d, method = "mean+sd", group_by = 'version')
 aggr_neat(metdat, aucs, method = "mean+sd", group_by = 'version')
-
 
 reshape(
     as.data.frame(met_stat[, c("study", 'version', 'aucs')]),
