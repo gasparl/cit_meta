@@ -221,8 +221,7 @@ for (i in dsets[order(nchar(dsets), dsets)]) {
   # dat_i_prep$p_i_diff_perstim_scaled
 
 
-  p_i_guilty = filter(dat_i_prep,  cond == 1)$probe_irrelevant_diff
-
+  datnum = as.numeric(strsplit(i, split = " ", fixed = TRUE)[[1]][2])
   sd_met_dat_i = get_sd_info(
       dat_i_prep,
       c(
@@ -231,12 +230,12 @@ for (i in dsets[order(nchar(dsets), dsets)]) {
           'd_cit_pooled'
       ),
       study_i,
-      i
+      datnum
   )
 
   preds_met_dat_i = data.frame(
       study = study_i,
-      dataset = i,
+      dataset = datnum,
       p_vs_i = dat_i_prep$probe_irrelevant_diff,
       p_vs_i_scaled_items = dat_i_prep$p_i_diff_perstim_scaled,
       d_cit = dat_i_prep$d_cit,
@@ -244,6 +243,8 @@ for (i in dsets[order(nchar(dsets), dsets)]) {
       cond = dat_i_prep$cond
   )
 
+
+  p_i_guilty = filter(dat_i_prep,  cond == 1)$probe_irrelevant_diff
   sd_i <- sd(p_i_guilty)* 0.5077 + 7.1245
 
   # Get the cohens d and stuff
@@ -263,7 +264,7 @@ for (i in dsets[order(nchar(dsets), dsets)]) {
       )
 
   met_dat_i = eff_data[[1]]
-  datnum = as.numeric(strsplit(i, split = " ", fixed = TRUE)[[1]][2])
+  met_dat_i$dataset = datnum
   l_fig_real[[datnum]] = eff_data[[2]]
   l_fig_sim[[datnum]] = eff_data[[3]]
 
@@ -312,24 +313,28 @@ for (i in dsets[order(nchar(dsets), dsets)]) {
 
 
 ## --- Standard Deviations
+# unique(sd_metdat$predictor_cit): probe_irrelevant_diff p_i_diff_perstim_scaled d_cit_pooled
 
-stat_dat = sd_metdat # [sd_metdat$predictor_cit == "probe_irrelevant_diff",]
+stat_dat = sd_metdat[sd_metdat$predictor_cit == "probe_irrelevant_diff",]
 
 #stat_dat = stat_dat[stat_dat$study_num != "dataset 9", ]
 corr_neat(stat_dat$sd_g, stat_dat$sd_i)
 t_neat(stat_dat$sd_g, stat_dat$sd_i, pair = T)
-wtd.cor(stat_dat$sd_g, stat_dat$sd_i, weight = (stat_dat$n_g+stat_dat$n_i))
+weights::wtd.cor(stat_dat$sd_g, stat_dat$sd_i, weight = (stat_dat$n_g+stat_dat$n_i))
 
 model = lm(sd_i~sd_g, data = stat_dat)
 summary(model)
 model = lm(sd_i~sd_g, data = stat_dat, weights = (stat_dat$n_g+stat_dat$n_i))
 summary(model)
 
-stat_dat$sd_sim2 = stat_dat$sd_g * 0.5077 + 7.1245 # unweighed: 0.4418+8.3898
-stat_dat$sd_sim2 = stat_dat$sd_g * 0.52479 +0.16970
+stat_dat$sd_sim2 = stat_dat$sd_g * model$coefficients[2] + model$coefficients[1]
+# weighted: 0.5077 + 7.1245
+# unweighed: 0.4418+8.3898
+#stat_dat$sd_sim2 = stat_dat$sd_g * 0.52479 +0.16970
 stat_dat$sd_sim3 = stat_dat$sd_g
 
 t_neat( stat_dat$sd_i, stat_dat$sd_sim2, pair = T )
+t_neat( stat_dat$sd_i, stat_dat$sd_sim3, pair = T )
 t_neat( stat_dat$sd_i, stat_dat$sd_sim3, pair = T )
 
 ggplot(stat_dat, aes(x = sd_g, y = sd_i, weight = (stat_dat$n_g+stat_dat$n_i) )) +
@@ -339,11 +344,11 @@ ggplot(stat_dat, aes(x = sd_g, y = sd_i, weight = (stat_dat$n_g+stat_dat$n_i) ))
         method = lm,
         fullrange = TRUE,
         level = .95,
-        color = "#444444",
+        color = "#111111",
         size = 0.5
     ) +
-    geom_point(aes(y = stat_dat$sd_sim2), shape = 16, color = "#FFFFFF") +
-    geom_text(label = rownames(stat_dat), color = "#000000") +
+    geom_point(aes(y = stat_dat$sd_sim2), shape = 16, size = 3, color = "#FFFFFF") +
+    geom_text(label = stat_dat$study_num, color = "#000000") +
     ylim(0, 50) +
     xlim(0, 50)
 
@@ -576,6 +581,27 @@ plot_neat(
 )
 
 ## -- Meta-analysis
+
+## sim Fig
+# p_vs_i
+fig_dat = metdat[metdat$version %in% c("p_vs_i", "simulated"), c("version", "dataset", "aucs", "auc_lower", "auc_upper")]
+fig_dat$dataset = as.factor(fig_dat$dataset)
+
+ggplot2::ggplot(data = fig_dat, aes(x = dataset,
+                                    y = aucs,
+                                    fill = version)) +
+    geom_bar(stat = "identity",
+             position = position_dodge(0.9)) +
+    scale_fill_manual(values = c('#333333', '#AAAAAA')) +
+    geom_errorbar(aes(
+    ymin = fig_dat$auc_lower,
+    ymax = fig_dat$auc_upper,
+    width = 0.2
+),
+position = position_dodge(0.9))
+
+
+##
 
 met_stat = metdat[metdat$version %in% c("p_vs_i","d_cit","d_cit_pooled", "p_vs_i_scaled_items"),]
 met_stat = metdat[metdat$version %in% c("p_vs_i","d_cit"),] # this is to easily change the examined variable

@@ -365,11 +365,11 @@ effectsize_data = function(id,
             ),
             auc_upper = c(
                 NA,
-                auc_ci(p_vs_i_auc$roc_obj, 2),
-                auc_ci(d_cit_auc$roc_obj, 2),
-                auc_ci(d_cit_pooled_auc$roc_obj, 2),
+                auc_ci(p_vs_i_auc$roc_obj, 3),
+                auc_ci(d_cit_auc$roc_obj, 3),
+                auc_ci(d_cit_pooled_auc$roc_obj, 3),
                 NA,
-                auc_ci(p_vs_i_scaled_items_auc$roc_obj, 2),
+                auc_ci(p_vs_i_scaled_items_auc$roc_obj, 3),
                 NA
             ),
             accuracies = c(
