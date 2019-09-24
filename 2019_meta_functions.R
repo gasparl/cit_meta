@@ -165,6 +165,9 @@ dat_prep = function(id,
         }
 }
 
+auc_ci = function(auc_obj, which_ci, ci = 0.95) {
+    pROC::ci.auc(auc_obj, conf.level = ci)[which_ci]
+}
 
 effectsize_data = function(id,
                            probe_irrelevant_diff,
@@ -193,7 +196,6 @@ effectsize_data = function(id,
             multiple_single = multiple_single,
             study = study
         )
-
 
     multiple_single <-
         ifelse(Data_Real$multiple_single[1] == 1, "multiple", "single")
@@ -255,6 +257,7 @@ effectsize_data = function(id,
         fig_real = NULL
         fig_sim = NULL
     }
+    print('hiTTTT')
 
     simulated_d <-
         cohen_d_between(Data_Sim$probe_irrelevant_diff, Data_Sim$cond) # simulate
@@ -272,7 +275,6 @@ effectsize_data = function(id,
         cohen_d_between(Data_Real$p_i_diff_perstim_scaled, Data_Real$cond) #real
     p_vs_i_scaled_trials_d <-
         cohen_d_between(Data_Real$p_i_diff_pertrial_scaled, Data_Real$cond) #real
-
 
     simulated_auc = t_neat(
         Data_Sim$probe_irrelevant_diff[Data_Sim$cond == 1],
@@ -319,6 +321,7 @@ effectsize_data = function(id,
         "p_vs_i_scaled_items",
         "p_vs_i_scaled_trials"
     )
+
     output <- list(
         tibble(
             cohens_d = c(
@@ -349,6 +352,24 @@ effectsize_data = function(id,
                 as.numeric(d_cit_pooled_auc$stats['auc']),
                 NA,
                 as.numeric(p_vs_i_scaled_items_auc$stats['auc']),
+                NA
+            ),
+            auc_lower = c(
+                NA,
+                auc_ci(p_vs_i_auc$roc_obj, 1),
+                auc_ci(d_cit_auc$roc_obj, 1),
+                auc_ci(d_cit_pooled_auc$roc_obj, 1),
+                NA,
+                auc_ci(p_vs_i_scaled_items_auc$roc_obj, 1),
+                NA
+            ),
+            auc_upper = c(
+                NA,
+                auc_ci(p_vs_i_auc$roc_obj, 2),
+                auc_ci(d_cit_auc$roc_obj, 2),
+                auc_ci(d_cit_pooled_auc$roc_obj, 2),
+                NA,
+                auc_ci(p_vs_i_scaled_items_auc$roc_obj, 2),
                 NA
             ),
             accuracies = c(

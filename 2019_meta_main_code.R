@@ -172,8 +172,6 @@ dsets = unique(Data_joined$dataset)
 set.seed(100)
 metdat <- tibble()
 roc_metdat <- tibble()
-study_prev <- "none"
-sd_prev <- 0
 count <- 0
 l_fig_real = list()
 l_fig_sim = list()
@@ -382,8 +380,8 @@ for (pred_type in c("p_vs_i", "d_cit", "d_cit_pooled", "p_vs_i_scaled_items")) {
             acc_cv_med = acc_med,
             TPs_orig = tnr,
             TNs_orig = tpr,
-            TPs_cv = tnr_mean,
-            TNs_cv = tpr_mean,
+            TPs_cv_mean = tnr_mean,
+            TNs_cv_mean = tpr_mean,
             TPs_cv_med = tnr_med,
             TNs_cv_med = tpr_med
         )
@@ -399,52 +397,183 @@ aggr_neat(accs_cv, values = "acc_orig", group_by = c("version"))
 aggr_neat(accs_cv, values = "acc_cv_mean", group_by = c("version"))
 aggr_neat(accs_cv, values = "acc_cv_med", group_by = c("version"))
 
+aggr_neat(accs_cv, values = "TPs_orig", group_by = c("version"))
+aggr_neat(accs_cv, values = "TPs_cv_mean", group_by = c("version"))
+aggr_neat(accs_cv, values = "TPs_cv_med", group_by = c("version"))
+
+aggr_neat(accs_cv, values = "TNs_orig", group_by = c("version"))
+aggr_neat(accs_cv, values = "TNs_cv_mean", group_by = c("version"))
+aggr_neat(accs_cv, values = "TNs_cv_med", group_by = c("version"))
+
 accs_cv_for_aov = accs_cv
 accs_cv_for_aov$version = as.character(accs_cv_for_aov$version)
 accs_cv_for_aov$version[accs_cv_for_aov$version == 'p_vs_i'] = 'p_vs_i_basic'
 accs_cv_wide = reshape(
-    as.data.frame(accs_cv_for_aov[accs_cv_for_aov$version %in% c("p_vs_i_basic", "d_cit_pooled", "p_vs_i_scaled_items"), c("study", 'version', 'acc_orig', 'acc_cv_mean', 'acc_cv_med')]),
+    as.data.frame(accs_cv_for_aov[accs_cv_for_aov$version %in% c("p_vs_i_basic", "d_cit_pooled", "p_vs_i_scaled_items"), c(
+        "study",
+        'version',
+        'acc_orig',
+        'acc_cv_mean',
+        'acc_cv_med',
+        'TPs_orig',
+        'TPs_cv_mean',
+        'TPs_cv_med',
+        'TNs_orig',
+        'TNs_cv_mean',
+        'TNs_cv_med'
+    )]),
     idvar = "study",
     timevar = "version",
     direction = "wide"
 )
-cat(names(accs_cv_wide), sep = "', '", fill = T)
+# cat(names(accs_cv_wide), sep = "', '", fill = T)
 
 anova_neat(
     accs_cv_wide,
     values = c(
-        'acc_orig.p_vs_i_basic',
-        'acc_cv_mean.p_vs_i_basic',
-        'acc_cv_med.p_vs_i_basic',
+        'TPs_orig.p_vs_i_basic',
+        'TPs_cv_mean.p_vs_i_basic',
+        'TPs_orig.d_cit_pooled',
+        'TPs_cv_mean.d_cit_pooled',
+        'TPs_orig.p_vs_i_scaled_items',
+        'TPs_cv_mean.p_vs_i_scaled_items',
+        'TNs_orig.p_vs_i_basic',
+        'TNs_cv_mean.p_vs_i_basic',
+        'TNs_orig.d_cit_pooled',
+        'TNs_cv_mean.d_cit_pooled',
+        'TNs_orig.p_vs_i_scaled_items',
+        'TNs_cv_mean.p_vs_i_scaled_items'
+    ),
+    within_ids = list(
+        orig_vs_cv = c('_orig', '_mean'),
+        acc_type = c('TPs_', 'TNs_'),
+        pred_type = c('p_vs_i_basic', 'd_cit_pooled', 'p_vs_i_scaled_items')
+    )
+)
+
+plot_neat(
+    accs_cv_wide,
+    values = c(
+        'TPs_orig.p_vs_i_basic',
+        'TPs_cv_mean.p_vs_i_basic',
+        'TPs_orig.d_cit_pooled',
+        'TPs_cv_mean.d_cit_pooled',
+        'TPs_orig.p_vs_i_scaled_items',
+        'TPs_cv_mean.p_vs_i_scaled_items',
+        'TNs_orig.p_vs_i_basic',
+        'TNs_cv_mean.p_vs_i_basic',
+        'TNs_orig.d_cit_pooled',
+        'TNs_cv_mean.d_cit_pooled',
+        'TNs_orig.p_vs_i_scaled_items',
+        'TNs_cv_mean.p_vs_i_scaled_items'
+    ),
+    within_ids = list(
+        orig_vs_cv = c('_orig', '_mean'),
+        acc_type = c('TPs_', 'TNs_'),
+        pred_type = c('p_vs_i_basic', 'd_cit_pooled', 'p_vs_i_scaled_items')
+    ), eb_method = sd, type = "bar", panel = 'acc_type'
+)
+
+
+anova_neat(
+    accs_cv_wide,
+    values = c(
+        'TPs_orig.p_vs_i_basic',
+        'TPs_cv_med.p_vs_i_basic',
+        'TPs_orig.d_cit_pooled',
+        'TPs_cv_med.d_cit_pooled',
+        'TPs_orig.p_vs_i_scaled_items',
+        'TPs_cv_med.p_vs_i_scaled_items',
+        'TNs_orig.p_vs_i_basic',
+        'TNs_cv_med.p_vs_i_basic',
+        'TNs_orig.d_cit_pooled',
+        'TNs_cv_med.d_cit_pooled',
+        'TNs_orig.p_vs_i_scaled_items',
+        'TNs_cv_med.p_vs_i_scaled_items'
+    ),
+    within_ids = list(
+        orig_vs_cv = c('_orig', '_med'),
+        acc_type = c('TPs_', 'TNs_'),
+        pred_type = c('p_vs_i_basic', 'd_cit_pooled', 'p_vs_i_scaled_items')
+    )
+)
+plot_neat(
+    accs_cv_wide,
+    values = c(
+        'TPs_orig.p_vs_i_basic',
+        'TPs_cv_med.p_vs_i_basic',
+        'TPs_orig.d_cit_pooled',
+        'TPs_cv_med.d_cit_pooled',
+        'TPs_orig.p_vs_i_scaled_items',
+        'TPs_cv_med.p_vs_i_scaled_items',
+        'TNs_orig.p_vs_i_basic',
+        'TNs_cv_med.p_vs_i_basic',
+        'TNs_orig.d_cit_pooled',
+        'TNs_cv_med.d_cit_pooled',
+        'TNs_orig.p_vs_i_scaled_items',
+        'TNs_cv_med.p_vs_i_scaled_items'
+    ),
+    within_ids = list(
+        orig_vs_cv = c('_orig', '_med'),
+        acc_type = c('TPs_', 'TNs_'),
+        pred_type = c('p_vs_i_basic', 'd_cit_pooled', 'p_vs_i_scaled_items')
+    ), eb_method = sd, type = "bar", panel = 'acc_type'
+)
+# follow-up for medians
+anova_neat(
+    accs_cv_wide,
+    values = c(
         'acc_orig.d_cit_pooled',
-        'acc_cv_mean.d_cit_pooled',
         'acc_cv_med.d_cit_pooled',
         'acc_orig.p_vs_i_scaled_items',
-        'acc_cv_mean.p_vs_i_scaled_items',
         'acc_cv_med.p_vs_i_scaled_items'
     ),
     within_ids = list(
-        acc_type = c('acc_orig', 'acc_cv_mean', 'acc_cv_med'),
-        pred_type = c('p_vs_i_basic', 'd_cit_pooled', 'p_vs_i_scaled_items')
+        orig_vs_cv = c('acc_orig', 'acc_cv_med'),
+        pred_type = c('d_cit_pooled', 'p_vs_i_scaled_items')
     )
 )
-
 anova_neat(
     accs_cv_wide,
     values = c(
         'acc_orig.p_vs_i_basic',
-        'acc_cv_mean.p_vs_i_basic',
-        'acc_orig.d_cit_pooled',
-        'acc_cv_mean.d_cit_pooled',
+        'acc_cv_med.p_vs_i_basic',
         'acc_orig.p_vs_i_scaled_items',
-        'acc_cv_mean.p_vs_i_scaled_items'
+        'acc_cv_med.p_vs_i_scaled_items'
     ),
     within_ids = list(
-        acc_type = c('acc_orig', 'acc_cv_mean'),
-        pred_type = c('p_vs_i_basic', 'd_cit_pooled', 'p_vs_i_scaled_items')
+        orig_vs_cv = c('acc_orig', 'acc_cv_med'),
+        pred_type = c('p_vs_i_basic', 'p_vs_i_scaled_items')
     )
 )
-
+anova_neat(
+    accs_cv_wide,
+    values = c(
+        'acc_orig.p_vs_i_basic',
+        'acc_cv_med.p_vs_i_basic',
+        'acc_orig.d_cit_pooled',
+        'acc_cv_med.d_cit_pooled'
+    ),
+    within_ids = list(
+        orig_vs_cv = c('acc_orig', 'acc_cv_med'),
+        pred_type = c('p_vs_i_basic', 'd_cit_pooled')
+    )
+)
+plot_neat(
+    accs_cv_wide,
+    values = c(
+        'acc_orig.p_vs_i_basic',
+        'acc_cv_med.p_vs_i_basic',
+        'acc_orig.d_cit_pooled',
+        'acc_cv_med.d_cit_pooled',
+        'acc_orig.p_vs_i_scaled_items',
+        'acc_cv_med.p_vs_i_scaled_items'
+    ),
+    within_ids = list(
+        acc_type = c('acc_orig', 'acc_cv_med'),
+        pred_type = c('p_vs_i_basic', 'd_cit_pooled', 'p_vs_i_scaled_items')
+    ), eb_method = sd, type = "bar"
+)
 
 ## -- Meta-analysis
 
