@@ -35,9 +35,9 @@ get_sd_info = function(fulprep_dat, preds_list, study, study_num) {
         m_g = mean(dat_guilt)
         m_i = mean(dat_innocent)
         row_x = data.frame(
-            predictor_cit = pred_to_get,
+            version = pred_to_get,
             study = study,
-            study_num = study_num,
+            dataset = study_num,
             #t = t,
             sd_g = sd_g,
             sd_i = sd_i,
@@ -128,7 +128,7 @@ dat_prep = function(id,
             sd_irr_stim = sd(mean_stim[type == "irrelevant"], na.rm = TRUE),
             d_cit_perstim = (mean_probe_stim-mean_irr_stim)/sd_irr_stim,
             mean_stim_scaled = scale(mean_stim),
-            p_i_diff_perstim_scaled = mean(mean_stim_scaled[type == "probe"], na.rm = TRUE),
+            p_vs_i_scaled_items = mean(mean_stim_scaled[type == "probe"], na.rm = TRUE),
 
             rt_probe = mean(rt[type == "probe"]),
             rt_irr = mean(rt[type == "irrelevant"]),
@@ -151,7 +151,7 @@ dat_prep = function(id,
         summarise_all(funs(ifelse((is.numeric(.)), mean(., na.rm = TRUE), first(.)
         ))) %>% # aggregrate
             mutate(
-                probe_irrelevant_diff = rt_probe - rt_irr,
+                p_vs_i = rt_probe - rt_irr,
                 d_cit = (rt_probe - rt_irr) / sd_irr_trials,
                 d_cit_pooled = (rt_probe - rt_irr) / sd_pooled_trials,
                 p_i_diff_pertrial_scaled = rt_probe_scaled
@@ -170,12 +170,12 @@ auc_ci = function(auc_obj, which_ci, ci = 0.95) {
 }
 
 effectsize_data = function(id,
-                           probe_irrelevant_diff,
+                           p_vs_i,
                            d_cit,
                            d_cit_pooled,
                            p_i_diff_pertrial_scaled,
                            d_cit_perstim,
-                           p_i_diff_perstim_scaled,
+                           p_vs_i_scaled_items,
                            cond,
                            multiple_single,
                            study,
@@ -186,12 +186,12 @@ effectsize_data = function(id,
     Data_Real <-
         tibble (
             id = id,
-            probe_irrelevant_diff = probe_irrelevant_diff,
+            p_vs_i = p_vs_i,
             d_cit = d_cit,
             d_cit_pooled = d_cit_pooled,
             p_i_diff_pertrial_scaled = p_i_diff_pertrial_scaled,
             d_cit_perstim = d_cit_perstim,
-            p_i_diff_perstim_scaled = p_i_diff_perstim_scaled,
+            p_vs_i_scaled_items = p_vs_i_scaled_items,
             cond = cond,
             multiple_single = multiple_single,
             study = study
@@ -215,7 +215,7 @@ effectsize_data = function(id,
         full_join (
             tibble(
                 cond = 0,
-                probe_irrelevant_diff = bayestestR::distribution_normal(n = 10000,  mean =
+                p_vs_i = bayestestR::distribution_normal(n = 10000,  mean =
                                                                             0, sd = sd)
             ),
             filter(Data_Real, cond == 1)
@@ -226,8 +226,8 @@ effectsize_data = function(id,
 
     if (add_figs == TRUE) {
         fig_real = t_neat(
-            Data_Real$probe_irrelevant_diff[Data_Real$cond == 1],
-            Data_Real$probe_irrelevant_diff[Data_Real$cond == 0],
+            Data_Real$p_vs_i[Data_Real$cond == 1],
+            Data_Real$p_vs_i[Data_Real$cond == 0],
             plot_densities = TRUE,
             bf_added = FALSE,
             auc_added = TRUE,
@@ -240,8 +240,8 @@ effectsize_data = function(id,
                                breaks = seq(-50, 50, by = 50)) +
             scale_y_continuous(limits = c(0, 0.025))
         fig_sim = t_neat(
-            Data_Sim$probe_irrelevant_diff[Data_Sim$cond == 1],
-            Data_Sim$probe_irrelevant_diff[Data_Sim$cond == 0],
+            Data_Sim$p_vs_i[Data_Sim$cond == 1],
+            Data_Sim$p_vs_i[Data_Sim$cond == 0],
             plot_densities = TRUE,
             bf_added = FALSE,
             auc_added = TRUE,
@@ -260,10 +260,10 @@ effectsize_data = function(id,
     print('hiTTTT')
 
     simulated_d <-
-        cohen_d_between(Data_Sim$probe_irrelevant_diff, Data_Sim$cond) # simulate
+        cohen_d_between(Data_Sim$p_vs_i, Data_Sim$cond) # simulate
 
     p_vs_i_d <-
-        cohen_d_between(Data_Real$probe_irrelevant_diff, Data_Real$cond) #real
+        cohen_d_between(Data_Real$p_vs_i, Data_Real$cond) #real
 
     d_cit_d <-
         cohen_d_between(Data_Real$d_cit, Data_Real$cond) #real
@@ -272,20 +272,20 @@ effectsize_data = function(id,
     d_cit_perstim_d <-
         cohen_d_between(Data_Real$d_cit_perstim, Data_Real$cond) #real
     p_vs_i_scaled_items_d <-
-        cohen_d_between(Data_Real$p_i_diff_perstim_scaled, Data_Real$cond) #real
+        cohen_d_between(Data_Real$p_vs_i_scaled_items, Data_Real$cond) #real
     p_vs_i_scaled_trials_d <-
         cohen_d_between(Data_Real$p_i_diff_pertrial_scaled, Data_Real$cond) #real
 
     simulated_auc = t_neat(
-        Data_Sim$probe_irrelevant_diff[Data_Sim$cond == 1],
-        Data_Sim$probe_irrelevant_diff[Data_Sim$cond == 0],
+        Data_Sim$p_vs_i[Data_Sim$cond == 1],
+        Data_Sim$p_vs_i[Data_Sim$cond == 0],
         auc_added = TRUE,
         bf_added = FALSE
     )
 
     p_vs_i_auc = t_neat(
-        Data_Real$probe_irrelevant_diff[Data_Real$cond == 1],
-        Data_Real$probe_irrelevant_diff[Data_Real$cond == 0],
+        Data_Real$p_vs_i[Data_Real$cond == 1],
+        Data_Real$p_vs_i[Data_Real$cond == 0],
         auc_added = TRUE,
         bf_added = FALSE
     )
@@ -307,8 +307,8 @@ effectsize_data = function(id,
 
 
     p_vs_i_scaled_items_auc = t_neat(
-        Data_Real$p_i_diff_perstim_scaled[Data_Real$cond == 1],
-        Data_Real$p_i_diff_perstim_scaled[Data_Real$cond == 0],
+        Data_Real$p_vs_i_scaled_items[Data_Real$cond == 1],
+        Data_Real$p_vs_i_scaled_items[Data_Real$cond == 0],
         auc_added = TRUE,
         bf_added = FALSE
     )
@@ -325,13 +325,13 @@ effectsize_data = function(id,
     output <- list(
         tibble(
             cohens_d = c(
-                as.numeric(simulated_d[1]),
-                as.numeric(p_vs_i_d[1]),
-                as.numeric(d_cit_d[1]),
-                as.numeric(d_cit_pooled_d[1]),
-                as.numeric(d_cit_perstim_d[1]),
-                as.numeric(p_vs_i_scaled_items_d[1]),
-                as.numeric(p_vs_i_scaled_trials_d[1])
+                -as.numeric(simulated_d[1]),
+                -as.numeric(p_vs_i_d[1]),
+                -as.numeric(d_cit_d[1]),
+                -as.numeric(d_cit_pooled_d[1]),
+                -as.numeric(d_cit_perstim_d[1]),
+                -as.numeric(p_vs_i_scaled_items_d[1]),
+                -as.numeric(p_vs_i_scaled_trials_d[1])
             ),
             variance_d = c(
                 as.numeric(simulated_d[2]),
@@ -419,12 +419,12 @@ effectsize_data = function(id,
 
 ### ROc stimulation etc
 
-roc_data = function(id,probe_irrelevant_diff,cond,multiple_single,study,sd) {
+roc_data = function(id,p_vs_i,cond,multiple_single,study,sd) {
 
     Data_Real <-
         tibble (
             id = id,
-            probe_irrelevant_diff = probe_irrelevant_diff,
+            p_vs_i = p_vs_i,
             cond = cond,
             multiple_single = multiple_single,
             study = study
@@ -436,7 +436,7 @@ roc_data = function(id,probe_irrelevant_diff,cond,multiple_single,study,sd) {
 
 
     # make the real roc
-    r1 <- roc(Data_Real$cond, Data_Real$probe_irrelevant_diff)
+    r1 <- roc(Data_Real$cond, Data_Real$p_vs_i)
 
   #save in a data frame
   r1_w <-  tibble( TP = r1$sensitivities,
@@ -451,14 +451,14 @@ roc_data = function(id,probe_irrelevant_diff,cond,multiple_single,study,sd) {
       full_join(
           tibble(
               cond = 0,
-              probe_irrelevant_diff = bayestestR::distribution_normal(n = 10000,  mean =
+              p_vs_i = bayestestR::distribution_normal(n = 10000,  mean =
                                                                           0, sd = sd)
           ),
           filter(Data_Real, cond == 1)
       )
 
   # roc over simulated data
-  r2 <- roc(Data_Sim$cond,Data_Sim$probe_irrelevant_diff)
+  r2 <- roc(Data_Sim$cond,Data_Sim$p_vs_i)
 
   # save in a data frame
   r2_w <-  tibble( TP = r2$sensitivities,

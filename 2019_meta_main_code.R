@@ -192,7 +192,7 @@ for (i in dsets[order(nchar(dsets), dsets)]) {
 
   ## 0
   # conventional overall probe RT mean minus irrelevant RT mean
-  # dat_i_prep$probe_irrelevant_diff
+  # dat_i_prep$p_vs_i
 
   ## 1
   # Cohen's d for CIT: dCIT =  (MRT(probes) -  MRT(irrelevants) )/SDRT(irrelevants)
@@ -218,15 +218,15 @@ for (i in dsets[order(nchar(dsets), dsets)]) {
   # we get one or few PROBE means, and at least four IRRELEVANT means
   # Then calculate the difference of the "mean of all PROBE means" vs "mean of all IRRELEVANT  means":
   # mean(PROBESmeans) - mean(IRRELEVANTSmeans)
-  # dat_i_prep$p_i_diff_perstim_scaled
+  # dat_i_prep$p_vs_i_scaled_items
 
 
   datnum = as.numeric(strsplit(i, split = " ", fixed = TRUE)[[1]][2])
   sd_met_dat_i = get_sd_info(
       dat_i_prep,
       c(
-          'probe_irrelevant_diff',
-          'p_i_diff_perstim_scaled',
+          'p_vs_i',
+          'p_vs_i_scaled_items',
           'd_cit_pooled'
       ),
       study_i,
@@ -236,27 +236,27 @@ for (i in dsets[order(nchar(dsets), dsets)]) {
   preds_met_dat_i = data.frame(
       study = study_i,
       dataset = datnum,
-      p_vs_i = dat_i_prep$probe_irrelevant_diff,
-      p_vs_i_scaled_items = dat_i_prep$p_i_diff_perstim_scaled,
+      p_vs_i = dat_i_prep$p_vs_i,
+      p_vs_i_scaled_items = dat_i_prep$p_vs_i_scaled_items,
       d_cit = dat_i_prep$d_cit,
       d_cit_pooled = dat_i_prep$d_cit_pooled,
       cond = dat_i_prep$cond
   )
 
 
-  p_i_guilty = filter(dat_i_prep,  cond == 1)$probe_irrelevant_diff
+  p_i_guilty = filter(dat_i_prep,  cond == 1)$p_vs_i
   sd_i <- sd(p_i_guilty)* 0.5077 + 7.1245
 
   # Get the cohens d and stuff
   eff_data <-
       effectsize_data(
           dat_i_prep$id,
-          dat_i_prep$probe_irrelevant_diff,
+          dat_i_prep$p_vs_i,
           dat_i_prep$d_cit,
           dat_i_prep$d_cit_pooled,
           dat_i_prep$p_i_diff_pertrial_scaled,
           dat_i_prep$d_cit_perstim,
-          dat_i_prep$p_i_diff_perstim_scaled,
+          dat_i_prep$p_vs_i_scaled_items,
           dat_i_prep$cond,
           dat_i_prep$multiple_single,
           dat_i_prep$study,
@@ -273,7 +273,7 @@ for (i in dsets[order(nchar(dsets), dsets)]) {
   roc_met_dat_i <-
       roc_data(
           dat_i_prep$id,
-          dat_i_prep$probe_irrelevant_diff,
+          dat_i_prep$p_vs_i,
           dat_i_prep$cond,
           dat_i_prep$multiple_single,
           dat_i_prep$study,
@@ -313,11 +313,23 @@ for (i in dsets[order(nchar(dsets), dsets)]) {
 
 
 ## --- Standard Deviations
-# unique(sd_metdat$predictor_cit): probe_irrelevant_diff p_i_diff_perstim_scaled d_cit_pooled
+# unique(sd_metdat$version): p_vs_i p_vs_i_scaled_items d_cit_pooled
 
-stat_dat = sd_metdat[sd_metdat$predictor_cit == "probe_irrelevant_diff",]
+stat_dat = sd_metdat[sd_metdat$version == "p_vs_i",]
 
-#stat_dat = stat_dat[stat_dat$study_num != "dataset 9", ]
+mean(stat_dat$m_g)
+mean(stat_dat$sd_g)
+mean_ci(stat_dat$sd_g, distance_only = F)
+g_sd_max = max(stat_dat$sd_g)
+g_sd_min = min(stat_dat$sd_g)
+#mean(stat_dat$m_i)
+mean(stat_dat$sd_i)
+mean_ci(stat_dat$sd_i, distance_only = F)
+i_sd_max = max(stat_dat$sd_i)
+i_sd_min = min(stat_dat$sd_i)
+
+
+#stat_dat = stat_dat[stat_dat$dataset != 9, ]
 corr_neat(stat_dat$sd_g, stat_dat$sd_i)
 t_neat(stat_dat$sd_g, stat_dat$sd_i, pair = T)
 weights::wtd.cor(stat_dat$sd_g, stat_dat$sd_i, weight = (stat_dat$n_g+stat_dat$n_i))
@@ -348,9 +360,31 @@ ggplot(stat_dat, aes(x = sd_g, y = sd_i, weight = (stat_dat$n_g+stat_dat$n_i) ))
         size = 0.5
     ) +
     geom_point(aes(y = stat_dat$sd_sim2), shape = 16, size = 3, color = "#FFFFFF") +
-    geom_text(label = stat_dat$study_num, color = "#000000") +
+    geom_text(label = stat_dat$dataset, color = "#000000") +
     ylim(0, 50) +
     xlim(0, 50)
+
+# SD and mean diff
+
+met_means_sds = sd_metdat
+met_means_sds$mean_diff = met_means_sds$m_g - met_means_sds$m_i
+
+met_means_sds = met_means_sds[met_means_sds$version == 'p_vs_i',] # p_vs_i, d_cit_pooled, p_vs_i_scaled_items
+corr_neat(met_means_sds$mean_diff, met_means_sds$sd_g)
+weights::wtd.cor(met_means_sds$mean_diff, met_means_sds$sd_g, weight = (met_means_sds$n_g+met_means_sds$n_i))
+
+ggplot(stat_dat, aes(x = sd_g, y = sd_i, weight = (stat_dat$n_g+stat_dat$n_i) )) +
+    theme_bw() +
+    geom_point(aes(y = stat_dat$sd_sim3), shape = 3) +
+    geom_smooth(
+        method = lm,
+        fullrange = TRUE,
+        level = .95,
+        color = "#111111",
+        size = 0.5
+    ) +
+    geom_point(aes(y = stat_dat$sd_sim2), shape = 16, size = 3, color = "#FFFFFF") +
+    geom_text(label = stat_dat$dataset, color = "#000000")
 
 
 ## -- Accuracies
@@ -604,7 +638,7 @@ position = position_dodge(0.9))
 ##
 
 met_stat = metdat[metdat$version %in% c("p_vs_i","d_cit","d_cit_pooled", "p_vs_i_scaled_items"),]
-met_stat = metdat[metdat$version %in% c("p_vs_i","d_cit"),] # this is to easily change the examined variable
+met_stat = metdat[metdat$version %in% c("p_vs_i","simulated"),] # this is to easily change the examined variable
 
 aggr_neat(metdat, cohens_d, method = "mean+sd", group_by = 'version')
 aggr_neat(metdat, aucs, method = "mean+sd", group_by = 'version')
@@ -627,8 +661,6 @@ met_stat$crowdsourced[grepl( "Noordraven & Verschuere", met_stat$study )] = "no"
 met_stat$crowdsourced[grepl( "Verschuere & Kleinberg (2015)", met_stat$study, fixed = T )] = "no"
 met_stat$multiple_single[met_stat$multiple_single == "inducer"] = "multiple"
 
-# since the - in cohens D just gives the direction we get rid of it cause normally you report cohens d not with + or - signs.
-met_stat$cohens_d <-met_stat$cohens_d *-1
 
 ### fixed-effects model
 REML1 <- rma(cohens_d, variance_d, data = met_stat, method = "REML")
@@ -674,6 +706,12 @@ forest(REML,
        xlab = "Effect Size (Cohen's d)")  # plot it
 
 ## ROC
+
+t_neat(metdat$aucs[metdat$version %in% c("simulated")],
+       metdat$aucs[metdat$version %in% c("p_vs_i")],
+       plot_densities = T,
+       pair = T)
+
 roc_met = roc_metdat
 
 roc_met$Author = paste(roc_met$study, roc_met$multiple_single) # to separate studies
