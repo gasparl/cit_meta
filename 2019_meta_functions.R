@@ -17,11 +17,12 @@ cohen_d_between = function(outcome, categ, for_table = T){
     out = paste("t(", ro(df,1), ")", " = ", ro(f), ", p = ", ro(pvalue, 3), ", dbetween = ", ro(d, 2), ", 95% CI [", ro(l$Lower.Conf.Limit.smd, 2), ", ", ro(l$Upper.Conf.Limit.smd, 2), "].", sep="")
   }
   v = (n1 + n2) / (n1*n2) + (d**2) / ( 2 *  (n1 + n2) )
-  print(v)
   stats <- cbind(d,v,out) # so I changed it here so its also outputting the cohens D
-  print(stats)
 }
 
+sed = function (v1, v2) {
+    esc::esc_mean_sd(mean(v1), sd(v1), length(v1), mean(v2), sd(v2), length(v2))$se
+}
 
 get_sd_info = function(fulprep_dat, preds_list, study, study_num) {
     for (pred_to_get in preds_list) {
@@ -312,6 +313,25 @@ effectsize_data = function(id,
         auc_added = TRUE,
         bf_added = FALSE
     )
+    #
+
+    simulated_sed = sed(
+        Data_Sim$p_vs_i[Data_Sim$cond == 1],
+        Data_Sim$p_vs_i[Data_Sim$cond == 0]
+    )
+    p_vs_i_sed = sed(
+        Data_Real$p_vs_i[Data_Real$cond == 1],
+        Data_Real$p_vs_i[Data_Real$cond == 0]
+    )
+    d_cit_pooled_sed = sed(
+        Data_Real$d_cit_pooled[Data_Real$cond == 1],
+        Data_Real$d_cit_pooled[Data_Real$cond == 0]
+    )
+    p_vs_i_scaled_items_sed = sed(
+        Data_Real$p_vs_i_scaled_items[Data_Real$cond == 1],
+        Data_Real$p_vs_i_scaled_items[Data_Real$cond == 0]
+    )
+
     the_versions = c(
         "simulated",
         "p_vs_i",
@@ -345,6 +365,15 @@ effectsize_data = function(id,
             version = the_versions,
             multiple_single = rep(multiple_single, length(the_versions)),
             study = rep(study, length(the_versions)),
+            sed = c(
+                simulated_sed,
+                p_vs_i_sed,
+                NA,
+                d_cit_pooled_sed,
+                NA,
+                p_vs_i_scaled_items_sed,
+                NA
+            ),
             aucs = c(
                 as.numeric(simulated_auc$stats['auc']),
                 as.numeric(p_vs_i_auc$stats['auc']),

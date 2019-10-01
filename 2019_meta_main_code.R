@@ -18,6 +18,7 @@ library(bayestestR)
 library(BayesFactor)
 library(pROC)
 library(neatStats)
+library(esc)
 
 add_figs = TRUE # takes time
 add_figs = FALSE
@@ -387,7 +388,7 @@ ggplot(stat_dat, aes(x = sd_g, y = sd_i, weight = (stat_dat$n_g+stat_dat$n_i) ))
     geom_text(label = stat_dat$dataset, color = "#000000")
 
 
-## -- Accuracies
+## -- Accuracies - cross-validated
 
 accs_cv = NULL
 for (pred_type in c("p_vs_i", "d_cit", "d_cit_pooled", "p_vs_i_scaled_items")) {
@@ -467,6 +468,7 @@ accs_cv_wide = reshape(
 )
 # cat(names(accs_cv_wide), sep = "', '", fill = T)
 
+##
 anova_neat(
     accs_cv_wide,
     values = c(
@@ -621,6 +623,8 @@ plot_neat(
 fig_dat = metdat[metdat$version %in% c("p_vs_i", "simulated"), c("version", "dataset", "aucs", "auc_lower", "auc_upper")]
 fig_dat$dataset = as.factor(fig_dat$dataset)
 
+corr_neat(metdat$aucs[metdat$version == "p_vs_i"], metdat$aucs[metdat$version == "simulated"])
+
 ggplot2::ggplot(data = fig_dat, aes(x = dataset,
                                     y = aucs,
                                     fill = version)) +
@@ -628,16 +632,21 @@ ggplot2::ggplot(data = fig_dat, aes(x = dataset,
              position = position_dodge(0.9)) +
     scale_fill_manual(values = c('#333333', '#AAAAAA')) +
     geom_errorbar(aes(
-    ymin = fig_dat$auc_lower,
-    ymax = fig_dat$auc_upper,
-    width = 0.2
-),
-position = position_dodge(0.9))
+        ymin = fig_dat$auc_lower,
+        ymax = fig_dat$auc_upper,
+        width = 0.2
+    ),
+    position = position_dodge(0.9)) + theme_bw() +
+    theme(panel.grid.major.x = element_blank()) +
+    theme(
+        panel.grid.major.y = element_line(color = "#d5d5d5"),
+        panel.grid.minor.y = element_line(color = "#d5d5d5")
+    )
 
 
-##
+### META-ANALYSES
 
-met_stat = metdat[metdat$version %in% c("p_vs_i","d_cit","d_cit_pooled", "p_vs_i_scaled_items"),]
+met_stat = metdat[metdat$version %in% c("p_vs_i", "d_cit_pooled", "p_vs_i_scaled_items"),]
 met_stat = metdat[metdat$version %in% c("p_vs_i","simulated"),] # this is to easily change the examined variable
 
 aggr_neat(metdat, cohens_d, method = "mean+sd", group_by = 'version')
@@ -659,51 +668,65 @@ thresholds = reshape(
 met_stat$crowdsourced = "yes"
 met_stat$crowdsourced[grepl( "Noordraven & Verschuere", met_stat$study )] = "no"
 met_stat$crowdsourced[grepl( "Verschuere & Kleinberg (2015)", met_stat$study, fixed = T )] = "no"
-met_stat$multiple_single[met_stat$multiple_single == "inducer"] = "multiple"
+# met_stat$multiple_single[met_stat$multiple_single == "inducer"] = "multiple"
 
-
-### fixed-effects model
-REML1 <- rma(cohens_d, variance_d, data = met_stat, method = "REML")
-REML1
-forest(REML1,
-       slab = met_stat$study,
-       mlab = "Summary effect size",
-       xlab = "Effect Size (Cohen's d)")  # plot it
-# so still al lot of variance left (75%)
-
-# Check for moderators
-REML2 <-
+REML_multi <-
     rma(
         cohens_d,
         variance_d,
         data = met_stat,
         method = "REML",
-        mods = ~ version + multiple_single
+        mods = ~ relevel(factor(version), ref = "p_vs_i") + relevel(factor(multiple_single), ref = "single") + crowdsourced #, level = 0.9
     )
-REML2# so in this case you can see that multiple or single probe influences the effect size but not simulated or no
-forest(REML2,
-       slab = met_stat$study,
-       mlab = "Summary effect size",
-       xlab = "Effect Size (Cohen's d)")  # plot it
-
-# You can fit it again with just multiple single to show that this can alone explain all variance in effect sizes
-
-# why not control for each study??
-
-
-REML <-
+## this is to compare pairwise the third pair
+REML_multi <-
     rma(
         cohens_d,
         variance_d,
         data = met_stat,
         method = "REML",
-        mods = ~ version
+        mods = ~ relevel(factor(version), ref = "d_cit_pooled") + relevel(factor(multiple_single), ref = "multiple") + crowdsourced #, level = 0.9
     )
-REML
-forest(REML,
+REML_multi
+# here the tests for multi-level factors
+anova(REML_multi, btt=2:3)
+anova(REML_multi, btt=4:5)
+
+forest(REML_multi,
        slab = met_stat$study,
        mlab = "Summary effect size",
        xlab = "Effect Size (Cohen's d)")  # plot it
+
+## ANOVA for AUC across different predictors
+
+met_stat_wide = data.frame(met_stat)
+met_stat_wide$version[met_stat_wide$version == 'p_vs_i'] = 'p_vs_i_basic'
+met_stat_wide = reshape(
+    as.data.frame(met_stat_wide[met_stat_wide$version %in% c("p_vs_i_basic", "d_cit_pooled", "p_vs_i_scaled_items", "simulated"), c(
+        "study",
+        'version',
+        'aucs',
+        'auc_lower',
+        'auc_upper'
+    )]),
+    idvar = "study",
+    timevar = "version",
+    direction = "wide"
+)
+
+aggr_neat(met_stat, aucs, method = "mean+sd", group_by = 'version')
+anova_neat(
+    met_stat_wide,
+    values = c(
+        'aucs.p_vs_i_basic',
+        'aucs.d_cit_pooled',
+        'aucs.p_vs_i_scaled_items'
+    ),
+    within_ids = 'predictor_version'
+)
+
+
+
 
 ## ROC
 
