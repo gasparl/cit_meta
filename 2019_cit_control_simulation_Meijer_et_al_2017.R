@@ -10,6 +10,7 @@ for (i in 1:1000) {
     simulated_sds = c(simulated_sds, sd(all_preds))
 }
 mean(simulated_sds)
+# mean_ci(simulated_sds, distance_only = F)
 min(simulated_sds)
 max(simulated_sds)
 

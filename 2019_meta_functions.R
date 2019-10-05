@@ -180,7 +180,7 @@ effectsize_data = function(id,
                            cond,
                            multiple_single,
                            study,
-                           sd) {
+                           sd_sim) {
 
 
 
@@ -216,8 +216,13 @@ effectsize_data = function(id,
         full_join (
             tibble(
                 cond = 0,
-                p_vs_i = bayestestR::distribution_normal(n = 10000,  mean =
-                                                                            0, sd = sd)
+                p_vs_i = bayestestR::distribution_normal(
+                    n = length(Data_Real$p_vs_i[Data_Real$cond == 0]),
+                    #n = 10000,
+                    mean =
+                        0,
+                    sd = sd_sim
+                )
             ),
             filter(Data_Real, cond == 1)
         )  # multiple
@@ -258,7 +263,6 @@ effectsize_data = function(id,
         fig_real = NULL
         fig_sim = NULL
     }
-    print('hiTTTT')
 
     simulated_d <-
         cohen_d_between(Data_Sim$p_vs_i, Data_Sim$cond) # simulate

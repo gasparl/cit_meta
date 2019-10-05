@@ -61,24 +61,20 @@ Data_VKT <- Data_VKT %>%
         # 1 = multiple, 0 = single
         cond = ifelse(is.even(cond), 1, 0),
         # here we set 0 & 2 to guilty (=1) and 1 & 3 to innocent (=0),
-        study = ifelse(
-            multiple_single == 0,
-            "Verschuere, Kleinberg, & Theocharidou (2015) SP",
-            "Verschuere, Kleinberg, & Theocharidou (2015) MP"
-        ),
+        study = "Verschuere, Kleinberg, & Theocharidou (2015) Exp2",
         dataset = ifelse(multiple_single == 0, "dataset 11", "dataset 10")
     )
 
 
 Data_KV1 <- Data_KV1 %>%
             mutate(multiple_single = 1, # 1 = multiple, 0 = single
-            study = "Kleinberg & Verschuere (2015) Study 1",
+            study = "Kleinberg & Verschuere (2015) Exp1",
             dataset = "dataset 1",
             cohd = as.numeric(cohd)) #for some reason cohens d is a charachter here which leads to issues with joining
 
 Data_KV2 <- Data_KV2 %>%
              mutate(multiple_single = 1, # 1 = multiple, 0 = single
-             study = "Kleinberg & Verschuere (2015) Study 2",
+             study = "Kleinberg & Verschuere (2015) Exp2",
              dataset = "dataset 2")
 
 Data_VK <- Data_VK %>%
@@ -97,16 +93,7 @@ Data_LKV <- Data_LKV %>%
         # 2 means inducer
         cond = ifelse(cond < 3, 1, 0),
         # here we set 0, 1, 2 to guilty (=1) and 3, 4, 5 to innocent (=0),
-        study = ifelse(
-            multiple_single == 0,
-            "Lukács, Kleinberg, & Verschuere (2017) SP",
-            "Lukács, Kleinberg, & Verschuere (2017) MP"
-        ),
-        study = ifelse(
-            multiple_single == 2,
-            "Lukács, Kleinberg, & Verschuere (2017) SPF",
-            study
-        ),
+        study = 'Lukács, Kleinberg, & Verschuere (2017) Exp1',
         dataset = ifelse(multiple_single == 0, "dataset 6", "dataset 5"),
         dataset = ifelse(multiple_single == 2, "dataset 7", dataset)
     )
@@ -143,7 +130,7 @@ Data_NV = Data_NV[,required_cols]
 Data_KV21 <- Data_KV21 %>%
     mutate(multiple_single = 1, # 1 = multiple, 0 = single
            cond = ifelse(cond == 1, 0, 1 ), # here we set 0 & 2 to guilty (=1) and 1 to innocent (=0),
-           study = "Kleinberg & Verschuere (2016) Study 1",
+           study = "Kleinberg & Verschuere (2016) Exp1",
            dataset = "dataset 3")
 Data_KV21 = Data_KV21[,required_cols]
 
@@ -152,7 +139,7 @@ Data_KV22 <- Data_KV22 %>%
     mutate(multiple_single = 1, # 1 = multiple, 0 = single
            cond = ifelse(cond == 0, 0, 1 ), # here we set 1 & 2 & 3 to guilty (=1) and 0 to innocent (remains 0), ,
            id = paste0(date, age, lang, cohd), # for some reason it has no ids; so i create one
-           study = "Kleinberg & Verschuere (2016) Study 2",
+           study = "Kleinberg & Verschuere (2016) Exp2",
            dataset = "dataset 4")
 Data_KV22 = Data_KV22[,required_cols]
 
@@ -168,6 +155,11 @@ Data_joined <- full_join(Data_joined, select(Data_KV21,-date)) # date problem ag
 Data_joined$id = as.character(Data_joined$id) # gotto convert it because last one is char
 Data_joined <- full_join(Data_joined, select(Data_KV22,-date)) # date problem again
 dsets = unique(Data_joined$dataset)
+
+
+# length(unique(paste(Data_joined$dataset, Data_joined$id, Data_joined$age, Data_joined$cond)))
+# Data_joined_probe = Data_joined[Data_joined$type == 'probe',]
+# length(unique(paste(Data_joined_probe$dataset, Data_joined_probe$id, Data_joined_probe$age, Data_joined_probe$cond, Data_joined_probe$id, Data_joined_probe$stim)))
 
 # now we loop through the Data
 set.seed(100)
@@ -221,6 +213,7 @@ for (i in dsets[order(nchar(dsets), dsets)]) {
   # mean(PROBESmeans) - mean(IRRELEVANTSmeans)
   # dat_i_prep$p_vs_i_scaled_items
 
+  # dat_i_prep$p_vs_i = dat_i_prep$p_vs_i_scaled_items # for quick testing of standardized probe RT
 
   datnum = as.numeric(strsplit(i, split = " ", fixed = TRUE)[[1]][2])
   sd_met_dat_i = get_sd_info(
@@ -234,6 +227,7 @@ for (i in dsets[order(nchar(dsets), dsets)]) {
       datnum
   )
 
+
   preds_met_dat_i = data.frame(
       study = study_i,
       dataset = datnum,
@@ -245,8 +239,9 @@ for (i in dsets[order(nchar(dsets), dsets)]) {
   )
 
 
-  p_i_guilty = filter(dat_i_prep,  cond == 1)$p_vs_i
-  sd_i <- sd(p_i_guilty)* 0.5077 + 7.1245
+  p_i_guilty = filter(dat_i_prep, cond == 1)$p_vs_i
+  sd_i <- sd(p_i_guilty) * 0.5077 + 7.1245
+  # sd_i <- 0.894
 
   # Get the cohens d and stuff
   eff_data <-
@@ -329,10 +324,13 @@ mean_ci(stat_dat$sd_i, distance_only = F)
 i_sd_max = max(stat_dat$sd_i)
 i_sd_min = min(stat_dat$sd_i)
 
+# simulated standardized probe RT's SD mean: 0.894
+# t.test(stat_dat$sd_i, mu = 0.894)
 
 #stat_dat = stat_dat[stat_dat$dataset != 9, ]
 corr_neat(stat_dat$sd_g, stat_dat$sd_i)
 t_neat(stat_dat$sd_g, stat_dat$sd_i, pair = T)
+t.test(stat_dat$sd_g, stat_dat$sd_i, paired = T)
 weights::wtd.cor(stat_dat$sd_g, stat_dat$sd_i, weight = (stat_dat$n_g+stat_dat$n_i))
 
 model = lm(sd_i~sd_g, data = stat_dat)
@@ -350,20 +348,35 @@ t_neat( stat_dat$sd_i, stat_dat$sd_sim2, pair = T )
 t_neat( stat_dat$sd_i, stat_dat$sd_sim3, pair = T )
 t_neat( stat_dat$sd_i, stat_dat$sd_sim3, pair = T )
 
-ggplot(stat_dat, aes(x = sd_g, y = sd_i, weight = (stat_dat$n_g+stat_dat$n_i) )) +
+
+
+ggplot(stat_dat, aes(
+    x = sd_g,
+    y = sd_i,
+    weight = (stat_dat$n_g + stat_dat$n_i)
+)) +
     theme_bw() +
-    geom_point(aes(y = stat_dat$sd_sim3), shape = 3) +
+    geom_point(aes(y = stat_dat$sd_sim3), shape = 3,
+               size = 3) +
     geom_smooth(
         method = lm,
         fullrange = TRUE,
         level = .95,
         color = "#111111",
-        size = 0.5
+        size = 0.7
     ) +
-    geom_point(aes(y = stat_dat$sd_sim2), shape = 16, size = 3, color = "#FFFFFF") +
-    geom_text(label = stat_dat$dataset, color = "#000000") +
+    geom_point(
+        aes(y = stat_dat$sd_sim2),
+        shape = 16,
+        size = 4,
+        color = "#FFFFFF"
+    ) +
+    geom_text(label = stat_dat$dataset,
+              color = "#000000",
+              size = 4) +
     ylim(0, 50) +
-    xlim(0, 50)
+    xlim(0, 50) + xlab("\nLiar data SD") + ylab("Control data SD\n") +
+    theme(text = element_text(family = "serif", size = 15))
 
 # SD and mean diff
 
@@ -511,9 +524,27 @@ plot_neat(
     within_ids = list(
         orig_vs_cv = c('_orig', '_mean'),
         acc_type = c('TPs_', 'TNs_'),
-        pred_type = c('p_vs_i_basic', 'd_cit_pooled', 'p_vs_i_scaled_items')
-    ), eb_method = sd, type = "bar", panel = 'acc_type'
-)
+        pred_type = c('p_vs_i_basic', 'p_vs_i_scaled_items', 'd_cit_pooled')
+    ),
+    eb_method = sd,
+    type = "bar",
+    panel = 'acc_type',
+    factor_names = c(orig_vs_cv = 'Cutoff', pred_type = ''),
+    value_names = c(
+        p_vs_i_basic = 'MPID',
+        p_vs_i_scaled_items = 'SPRT',
+        d_cit_pooled = 'SPID',
+        '_orig' = 'Optimal',
+        '_mean' = 'Inferred',
+        TPs_ = 'True positive rate',
+        TNs_ = 'True negative rate'
+    )
+) + theme(text = element_text(size = 21)) + scale_y_continuous(breaks = c(
+    "0" = 0,
+    ".25" = 0.25,
+    ".50" = 0.5,
+    ".75" = 0.75
+))
 
 
 anova_neat(
@@ -622,48 +653,57 @@ plot_neat(
 # p_vs_i
 fig_dat = metdat[metdat$version %in% c("p_vs_i", "simulated"), c("version", "dataset", "aucs", "auc_lower", "auc_upper")]
 fig_dat$dataset = as.factor(fig_dat$dataset)
-
-corr_neat(metdat$aucs[metdat$version == "p_vs_i"], metdat$aucs[metdat$version == "simulated"])
-
+fig_dat$Simulated = 'Real'
+fig_dat$Simulated[fig_dat$version == "simulated"] = 'Simulated'
 ggplot2::ggplot(data = fig_dat, aes(x = dataset,
                                     y = aucs,
-                                    fill = version)) +
+                                    fill = Simulated)) +
     geom_bar(stat = "identity",
              position = position_dodge(0.9)) +
-    scale_fill_manual(values = c('#333333', '#AAAAAA')) +
+    scale_fill_manual(values = c('#AAAAAA', '#333333'), name = NULL) +
     geom_errorbar(aes(
         ymin = fig_dat$auc_lower,
         ymax = fig_dat$auc_upper,
         width = 0.2
     ),
     position = position_dodge(0.9)) + theme_bw() +
-    theme(panel.grid.major.x = element_blank()) +
+    theme(panel.grid.major.x = element_blank())  +
+    scale_y_continuous(breaks = c(
+        "0" = 0,
+        ".25" = 0.25,
+        ".50" = 0.5,
+        ".75" = 0.75
+    )) +
+    ylab("Area under the curve") + xlab("Dataset (individual experimental design)") +
     theme(
         panel.grid.major.y = element_line(color = "#d5d5d5"),
-        panel.grid.minor.y = element_line(color = "#d5d5d5")
+        panel.grid.minor.y = element_line(color = "#d5d5d5"),
+        legend.position = "bottom",
+        text = element_text(family = "serif", size = 17)
     )
 
 
 ### META-ANALYSES
 
-met_stat = metdat[metdat$version %in% c("p_vs_i", "d_cit_pooled", "p_vs_i_scaled_items"),]
-met_stat = metdat[metdat$version %in% c("p_vs_i","simulated"),] # this is to easily change the examined variable
-
 aggr_neat(metdat, cohens_d, method = "mean+sd", group_by = 'version')
 aggr_neat(metdat, aucs, method = "mean+sd", group_by = 'version')
 
-reshape(
-    as.data.frame(met_stat[, c("study", 'version', 'aucs')]),
-    idvar = "study",
-    timevar = "version",
-    direction = "wide"
-)
-thresholds = reshape(
-    as.data.frame(met_stat[, c("study", 'version', 'thresholds')]),
-    idvar = "study",
-    timevar = "version",
-    direction = "wide"
-)
+met_stat = metdat[metdat$version %in% c("p_vs_i", "d_cit_pooled", "p_vs_i_scaled_items"),]
+met_stat = metdat[metdat$version %in% c("p_vs_i","simulated"),] # this is to easily change the examined variable
+
+
+# reshape(
+#     as.data.frame(met_stat[, c("study", 'version', 'aucs')]),
+#     idvar = "study",
+#     timevar = "version",
+#     direction = "wide"
+# )
+# thresholds = reshape(
+#     as.data.frame(met_stat[, c("study", 'version', 'thresholds')]),
+#     idvar = "study",
+#     timevar = "version",
+#     direction = "wide"
+# )
 
 met_stat$crowdsourced = "yes"
 met_stat$crowdsourced[grepl( "Noordraven & Verschuere", met_stat$study )] = "no"
@@ -678,6 +718,7 @@ REML_multi <-
         method = "REML",
         mods = ~ relevel(factor(version), ref = "p_vs_i") + relevel(factor(multiple_single), ref = "single") + crowdsourced #, level = 0.9
     )
+REML_multi
 ## this is to compare pairwise the third pair
 REML_multi <-
     rma(
@@ -688,14 +729,25 @@ REML_multi <-
         mods = ~ relevel(factor(version), ref = "d_cit_pooled") + relevel(factor(multiple_single), ref = "multiple") + crowdsourced #, level = 0.9
     )
 REML_multi
+## this is to compare pairwise the third pair
+REML_multi <-
+    rma(
+        cohens_d,
+        variance_d,
+        data = met_stat,
+        method = "REML",
+        mods = ~ relevel(factor(version), ref = "p_vs_i") + relevel(factor(multiple_single), ref = "multiple") + crowdsourced #, level = 0.9
+    )
+REML_multi
 # here the tests for multi-level factors
 anova(REML_multi, btt=2:3)
 anova(REML_multi, btt=4:5)
+anova(REML_multi, btt=3:4)
 
 forest(REML_multi,
        slab = met_stat$study,
        mlab = "Summary effect size",
-       xlab = "Effect Size (Cohen's d)")  # plot it
+       xlab = "Effect Size (Cohen's d)" )  # plot it
 
 ## ANOVA for AUC across different predictors
 
@@ -725,7 +777,46 @@ anova_neat(
     within_ids = 'predictor_version'
 )
 
+## t-test for AUC between simulated and real
 
+t_neat(metdat$aucs[metdat$version == 'p_vs_i'],
+       metdat$aucs[metdat$version == 'simulated'],
+       pair = T,
+       round_descr = 3)
+t.test(metdat$aucs[metdat$version == 'p_vs_i'],
+       metdat$aucs[metdat$version == 'simulated'], paired = T)
+
+
+corr_neat(metdat$aucs[metdat$version == "p_vs_i"], metdat$aucs[metdat$version == "simulated"])
+
+weights::wtd.cor(metdat$aucs[metdat$version == "p_vs_i"], metdat$aucs[metdat$version == "simulated"], weight = (sd_metdat$n_g[sd_metdat$version == "p_vs_i"]+sd_metdat$n_i[sd_metdat$version == "p_vs_i"]))
+
+
+## BF META
+
+#install.packages('metaBMA')
+
+bayes_model = metaBMA::meta_random(
+    y = cohens_d~version+multiple_single+crowdsourced,
+    SE = sed,
+    labels = study,
+    data = met_stat
+)
+bayes_model$BF
+
+bayes_model_without = metaBMA::meta_random(
+    y = cohens_d~multiple_single+crowdsourced,
+    SE = sed,
+    labels = study,
+    data = met_stat
+)
+bayes_model_without$BF
+
+metaBMA::plot_forest(bayes_model)
+
+metaBMA::inclusion(list(bayes_model, bayes_model_without))
+
+bayes_model$posterior_models
 
 
 ## ROC
