@@ -68,6 +68,11 @@ Data_KV22 <- read_tsv("collapsed_endfile_Exp2.txt") # Kleinberg & Verschuere (20
 Data_KV22 = Data_KV22[Data_KV22$ER_all_pro < 0.5 &
                           Data_KV22$ER_all_irr < 0.5 & Data_KV22$ER_all_tar < 0.5, ]
 
+Data_HU <- read_tsv("hu_et_al_2013.txt")
+
+# Data_GBKV <- read_sav("Inquisit_Final.sav") # no conditions for this one
+
+
 # all types error < 50% (50% or more error excluded)
 
 ########################
@@ -196,6 +201,46 @@ Data_KV22 <- Data_KV22 %>%
            study = "Kleinberg & Verschuere (2016) Study 2",
            dataset = "dataset 4")
 
+hu1_pvi_g = Data_HU$G_probe_standard - Data_HU$G_irrelevant_standard
+hu1_pvi_i = Data_HU$I_probe_standard - Data_HU$I_irrelevant_standard
+hu1_pvi_g = hu1_pvi_g[!is.na(hu1_pvi_g)]
+hu1_pvi_i = hu1_pvi_i[!is.na(hu1_pvi_i)]
+
+Data_HU1 = data.frame(p_vs_i = c(hu1_pvi_g, hu1_pvi_i),
+                      cond_base = c(rep(1, length(hu1_pvi_g)), rep(0, length(hu1_pvi_i))))
+
+Data_HU1 <- Data_HU1 %>%
+    mutate(
+        multiple_single = 1,
+        # 1 = multiple, 0 = single
+        cond = cond_base,
+        # here we set 0 & 2 to guilty (=1) and 1 & 3 to innocent (=0),
+        cond_base = NULL,
+        study = "Hu et al. (2013) Standard",
+        dataset = "dataset 12"
+    )
+
+
+hu2_pvi_g = Data_HU$G_probe_dot - Data_HU$G_irrelevant_dot
+hu2_pvi_i = Data_HU$I_probe_dot - Data_HU$I_irrelevant_dot
+hu2_pvi_g = hu2_pvi_g[!is.na(hu2_pvi_g)]
+hu2_pvi_i = hu2_pvi_i[!is.na(hu2_pvi_i)]
+
+Data_HU2 = data.frame(p_vs_i = c(hu2_pvi_g, hu2_pvi_i),
+                      cond_base = c(rep(1, length(hu2_pvi_g)), rep(0, length(hu2_pvi_i))))
+
+Data_HU2 <- Data_HU2 %>%
+    mutate(
+        multiple_single = 1,
+        # 1 = multiple, 0 = single
+        cond = cond_base,
+        # here we set 0 & 2 to guilty (=1) and 1 & 3 to innocent (=0),
+        cond_base = NULL,
+        study = "Hu et al. (2013) Dot",
+        dataset = "dataset 13"
+    )
+
+
 # join them all together
 # joining unfortunately only takes 2 arguments but it has other benefits so its nicer this way
 
@@ -206,6 +251,8 @@ Data_joined <- full_join(Data_joined, Data_LKV)
 Data_joined <- full_join(Data_joined, Data_NV)
 Data_joined <- full_join(Data_joined, Data_KV21)
 Data_joined <- full_join(Data_joined, Data_KV22)
+Data_joined <- full_join(Data_joined, Data_HU1)
+Data_joined <- full_join(Data_joined, Data_HU2)
 Data_joined = Data_joined[!is.na(Data_joined$p_vs_i),]
 dsets = unique(Data_joined$dataset)
 
@@ -224,6 +271,8 @@ for (i in dsets[order(nchar(dsets), dsets)]) {
   cat("------------ started ", i, ": ", study_i, fill = T)
 
   dat_i_prep = dat_i
+  datnum = as.numeric(strsplit(i, split = " ", fixed = TRUE)[[1]][2])
+
 
   p_i_guilty = filter(dat_i,  cond == 1)$p_vs_i
 
@@ -239,7 +288,7 @@ for (i in dsets[order(nchar(dsets), dsets)]) {
       cond = dat_i_prep$cond
   )
 
-  sd_i <- sd(p_i_guilty)* 0.5077 + 7.1245
+  sd_i <- sd(p_i_guilty)*0.5077 + 7.1245
 
   # Get the cohens d and stuff
   eff_data <-
@@ -258,7 +307,7 @@ for (i in dsets[order(nchar(dsets), dsets)]) {
       )
 
   met_dat_i = eff_data[[1]]
-
+  met_dat_i$dataset = datnum
   # get ROC data
 
   roc_met_dat_i <-
@@ -288,97 +337,95 @@ for (i in dsets[order(nchar(dsets), dsets)]) {
   cat("finished", i, ": ", study_i, fill = T)
 }
 
-
-## -- Meta-analysis
+## META
 
 met_stat = metdat[metdat$version %in% c("p_vs_i","simulated"),] # this is to easily change the examined variable
 
-aggr_neat(met_stat, cohens_d, method = "mean+sd", group_by = 'version')
-aggr_neat(met_stat, aucs, method = "mean+sd", group_by = 'version')
+met_stat = met_stat[order(met_stat$study, met_stat$version),]
 
-reshape(
-    as.data.frame(met_stat[, c("study", 'version', 'aucs')]),
-    idvar = "study",
-    timevar = "version",
-    direction = "wide"
-)
-reshape(
-    as.data.frame(met_stat[, c("study", 'version', 'thresholds')]),
-    idvar = "study",
-    timevar = "version",
-    direction = "wide"
-)
+met_stat$multiple_single[met_stat$multiple_single == 'multiple'] = 'MP'
+met_stat$multiple_single[met_stat$multiple_single == 'single'] = 'SP'
+met_stat$multiple_single[met_stat$multiple_single == 'inducer'] = 'SPF'
+met_stat$simulated = 'No'
+met_stat$simulated[met_stat$version == 'simulated'] = 'Yes'
 
-met_stat$crowdsourced = "yes"
-met_stat$crowdsourced[grepl( "Noordraven & Verschuere", met_stat$study )] = "no"
-met_stat$crowdsourced[grepl( "Verschuere & Kleinberg (2015)", met_stat$study, fixed = T )] = "no"
-met_stat$multiple_single[met_stat$multiple_single == "inducer"] = "multiple"
+met_stat$crowdsourced = "Yes"
+met_stat$crowdsourced[grepl( "Noordraven & Verschuere", met_stat$study )] = "No"
+met_stat$crowdsourced[grepl( "Verschuere & Kleinberg (2015)", met_stat$study, fixed = T )] = "No"
+met_stat$crowdsourced[grepl( "Hu et", met_stat$study, fixed = T )] = "No"
 
-# since the - in cohens D just gives the direction we get rid of it cause normally you report cohens d not with + or - signs.
-met_stat$cohens_d <-met_stat$cohens_d *-1
-
-### fixed-effects model
-REML1 <- rma(cohens_d, variance_d, data = met_stat, method = "REML")
-REML1
-forest(REML1,
-       slab = met_stat$study,
-       mlab = "Summary effect size",
-       xlab = "Effect Size (Cohen's d)")  # plot it
-# so still al lot of variance left (75%)
-
-# Check for moderators
-REML2 <-
+REML_multi <-
     rma(
         cohens_d,
         variance_d,
         data = met_stat,
         method = "REML",
-        mods = ~ version + multiple_single
+        mods = ~ relevel(factor(version), ref = "p_vs_i") + relevel(factor(multiple_single), ref = "SP") + crowdsourced #, level = 0.9
     )
-REML2# so in this case you can see that multiple or single probe influences the effect size but not simulated or no
-forest(REML2,
-       slab = met_stat$study,
-       mlab = "Summary effect size",
-       xlab = "Effect Size (Cohen's d)")  # plot it
-
-# You can fit it again with just multiple single to show that this can alone explain all variance in effect sizes
-
-# why not control for each study??
-
-
-REML <-
+REML_multi
+## this is to compare pairwise the third pair
+REML_multi <-
     rma(
         cohens_d,
         variance_d,
         data = met_stat,
         method = "REML",
-        mods = ~ version
+        mods = ~ relevel(factor(version), ref = "d_cit_pooled") + relevel(factor(multiple_single), ref = "MP") + crowdsourced #, level = 0.9
     )
-REML
-forest(REML,
-       slab = met_stat$study,
-       mlab = "Summary effect size",
-       xlab = "Effect Size (Cohen's d)")  # plot it
+REML_multi
+## this is to compare pairwise the third pair
+REML_multi <-
+    rma(
+        cohens_d,
+        variance_d,
+        data = met_stat,
+        method = "REML",
+        mods = ~ relevel(factor(version), ref = "p_vs_i") + relevel(factor(multiple_single), ref = "MP") + crowdsourced #, level = 0.9
+    )
+REML_multi
+# here the tests for multi-level factors
+anova(REML_multi, btt=2:3)
+anova(REML_multi, btt=4:5)
+anova(REML_multi, btt=3:4)
 
-## ROC
-roc_met = roc_metdat
+forest(
+    REML_multi,
+    psize = 1,
+    xlab = NULL,
+    xlim = c(-10, 5.9),
+    slab = met_stat$study,
+    ilab = cbind(
+        met_stat$multiple_single,
+        met_stat$crowdsourced,
+        met_stat$simulated
+    ),
+    ilab.xpos = c(-4.0, -2.6, -1.3),
+    cex = 0.75,
+    fonts = 'serif'
+)  # plot it
 
-roc_met$Author = paste(roc_met$study, roc_met$multiple_single) # to separate studies
-roc_met$crowdsourced = "yes"
-roc_met$crowdsourced[grepl( "Noordraven & Verschuere", roc_met$study )] = "no"
-roc_met$crowdsourced[grepl( "Verschuere & Kleinberg (2015)", roc_met$study, fixed = T )] = "no"
-roc_met$multiple_single[roc_met$multiple_single == "inducer"] = "multiple"
+text(
+    x = c(-9.1, -4.1, -2.7, -1.2, 3.0),
+    y = 24,
+    labels = c(
+        "Dataset title",
+        "Protocol",
+        "Crowdsourced",
+        "Simulated",
+        "Effect Size (Cohen's d) and 95% CI"
+    ),
+    font = 2,
+    family = 'serif',
+    cex = .9
+)
 
-unique(roc_metdat$study)
-unique(met_stat$study)
-unique(roc_met$Author)
+# t test
 
-roc_met = roc_met[,c('TP', 'FP', 'FN', 'TN', 'simulated', 'multiple_single', 'Author', 'crowdsourced')]
+t_neat(metdat$aucs[metdat$version == 'p_vs_i'],
+       metdat$aucs[metdat$version == 'simulated'],
+       pair = T,
+       round_descr = 3)
+t.test(metdat$aucs[metdat$version == 'p_vs_i'],
+       metdat$aucs[metdat$version == 'simulated'], paired = T)
 
-# these below take forever; sth must be modified
-
-# metaROC(roc_met, plot.Author=TRUE)
-
-# roc_results = metaROC(roc_met, plot.Author=TRUE, model="random-effects")
-
-
+corr_neat(metdat$aucs[metdat$version == "p_vs_i"], metdat$aucs[metdat$version == "simulated"])

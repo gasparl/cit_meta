@@ -156,6 +156,7 @@ Data_joined$id = as.character(Data_joined$id) # gotto convert it because last on
 Data_joined <- full_join(Data_joined, select(Data_KV22,-date)) # date problem again
 dsets = unique(Data_joined$dataset)
 
+# saveRDS(Data_joined, file="2019_meta_data_trial_level.Rds")
 
 # length(unique(paste(Data_joined$dataset, Data_joined$id, Data_joined$age, Data_joined$cond)))
 # Data_joined_probe = Data_joined[Data_joined$type == 'probe',]
@@ -240,7 +241,7 @@ for (i in dsets[order(nchar(dsets), dsets)]) {
 
 
   p_i_guilty = filter(dat_i_prep, cond == 1)$p_vs_i
-  sd_i <- sd(p_i_guilty) * 0.5077 + 7.1245
+  sd_i <- sd(p_i_guilty) #* 0.5077 + 7.1245
   # sd_i <- 0.894
 
   # Get the cohens d and stuff
@@ -263,6 +264,10 @@ for (i in dsets[order(nchar(dsets), dsets)]) {
   met_dat_i$dataset = datnum
   l_fig_real[[datnum]] = eff_data[[2]]
   l_fig_sim[[datnum]] = eff_data[[3]]
+
+  probe_rt_inn = filter(dat_i_prep, cond == 0)$rt_probe
+  irr_rt_inn = filter(dat_i_prep, cond == 0)$rt_irr
+  met_dat_i$eff_p_i_control = t_neat(probe_rt_inn, irr_rt_inn, bf_added = F)$stats['d']
 
   # get ROC data
 
@@ -446,17 +451,17 @@ for (pred_type in c("p_vs_i", "d_cit", "d_cit_pooled", "p_vs_i_scaled_items")) {
     }
 }
 
-aggr_neat(accs_cv, values = "acc_orig", group_by = c("version"))
-aggr_neat(accs_cv, values = "acc_cv_mean", group_by = c("version"))
-aggr_neat(accs_cv, values = "acc_cv_med", group_by = c("version"))
+aggr_neat(accs_cv, values = "acc_orig", group_by = c("version"), method = 'mean+sd')
+aggr_neat(accs_cv, values = "acc_cv_mean", group_by = c("version"), method = 'mean+sd')
+aggr_neat(accs_cv, values = "acc_cv_med", group_by = c("version"), method = 'mean+sd')
 
-aggr_neat(accs_cv, values = "TPs_orig", group_by = c("version"))
-aggr_neat(accs_cv, values = "TPs_cv_mean", group_by = c("version"))
-aggr_neat(accs_cv, values = "TPs_cv_med", group_by = c("version"))
+aggr_neat(accs_cv, values = "TPs_orig", group_by = c("version"), method = 'mean+sd')
+aggr_neat(accs_cv, values = "TPs_cv_mean", group_by = c("version"), method = 'mean+sd')
+aggr_neat(accs_cv, values = "TPs_cv_med", group_by = c("version"), method = 'mean+sd')
 
-aggr_neat(accs_cv, values = "TNs_orig", group_by = c("version"))
-aggr_neat(accs_cv, values = "TNs_cv_mean", group_by = c("version"))
-aggr_neat(accs_cv, values = "TNs_cv_med", group_by = c("version"))
+aggr_neat(accs_cv, values = "TNs_orig", group_by = c("version"), method = 'mean+sd')
+aggr_neat(accs_cv, values = "TNs_cv_mean", group_by = c("version"), method = 'mean+sd')
+aggr_neat(accs_cv, values = "TNs_cv_med", group_by = c("version"), method = 'mean+sd')
 
 accs_cv_for_aov = accs_cv
 accs_cv_for_aov$version = as.character(accs_cv_for_aov$version)
@@ -691,6 +696,17 @@ aggr_neat(metdat, aucs, method = "mean+sd", group_by = 'version')
 met_stat = metdat[metdat$version %in% c("p_vs_i", "d_cit_pooled", "p_vs_i_scaled_items"),]
 met_stat = metdat[metdat$version %in% c("p_vs_i","simulated"),] # this is to easily change the examined variable
 
+met_stat = met_stat[order(met_stat$dataset, met_stat$version),]
+
+met_stat$multiple_single[met_stat$multiple_single == 'multiple'] = 'MP'
+met_stat$multiple_single[met_stat$multiple_single == 'single'] = 'SP'
+met_stat$multiple_single[met_stat$multiple_single == 'inducer'] = 'SPF'
+met_stat$simulated = 'No'
+met_stat$simulated[met_stat$version == 'simulated'] = 'Yes'
+
+met_stat$crowdsourced = "Yes"
+met_stat$crowdsourced[grepl( "Noordraven & Verschuere", met_stat$study )] = "No"
+met_stat$crowdsourced[grepl( "Verschuere & Kleinberg (2015)", met_stat$study, fixed = T )] = "No"
 
 # reshape(
 #     as.data.frame(met_stat[, c("study", 'version', 'aucs')]),
@@ -705,9 +721,6 @@ met_stat = metdat[metdat$version %in% c("p_vs_i","simulated"),] # this is to eas
 #     direction = "wide"
 # )
 
-met_stat$crowdsourced = "yes"
-met_stat$crowdsourced[grepl( "Noordraven & Verschuere", met_stat$study )] = "no"
-met_stat$crowdsourced[grepl( "Verschuere & Kleinberg (2015)", met_stat$study, fixed = T )] = "no"
 # met_stat$multiple_single[met_stat$multiple_single == "inducer"] = "multiple"
 
 REML_multi <-
@@ -716,7 +729,7 @@ REML_multi <-
         variance_d,
         data = met_stat,
         method = "REML",
-        mods = ~ relevel(factor(version), ref = "p_vs_i") + relevel(factor(multiple_single), ref = "single") + crowdsourced #, level = 0.9
+        mods = ~ relevel(factor(version), ref = "p_vs_i") + relevel(factor(multiple_single), ref = "SP") + crowdsourced #, level = 0.9
     )
 REML_multi
 ## this is to compare pairwise the third pair
@@ -726,7 +739,7 @@ REML_multi <-
         variance_d,
         data = met_stat,
         method = "REML",
-        mods = ~ relevel(factor(version), ref = "d_cit_pooled") + relevel(factor(multiple_single), ref = "multiple") + crowdsourced #, level = 0.9
+        mods = ~ relevel(factor(version), ref = "d_cit_pooled") + relevel(factor(multiple_single), ref = "MP") + crowdsourced #, level = 0.9
     )
 REML_multi
 ## this is to compare pairwise the third pair
@@ -736,7 +749,7 @@ REML_multi <-
         variance_d,
         data = met_stat,
         method = "REML",
-        mods = ~ relevel(factor(version), ref = "p_vs_i") + relevel(factor(multiple_single), ref = "multiple") + crowdsourced #, level = 0.9
+        mods = ~ relevel(factor(version), ref = "p_vs_i") + relevel(factor(multiple_single), ref = "MP") + crowdsourced #, level = 0.9
     )
 REML_multi
 # here the tests for multi-level factors
@@ -744,10 +757,38 @@ anova(REML_multi, btt=2:3)
 anova(REML_multi, btt=4:5)
 anova(REML_multi, btt=3:4)
 
-forest(REML_multi,
-       slab = met_stat$study,
-       mlab = "Summary effect size",
-       xlab = "Effect Size (Cohen's d)" )  # plot it
+forest(
+    REML_multi,
+    psize = 1,
+    xlab = NULL,
+    xlim = c(-10, 5.9),
+    slab = met_stat$study,
+    ilab = cbind(
+        met_stat$multiple_single,
+        met_stat$crowdsourced,
+        met_stat$simulated
+    ),
+    ilab.xpos = c(-4.0, -2.6, -1.3),
+    cex = 0.75,
+    fonts = 'serif'
+)  # plot it
+
+text(
+    x = c(-9.1, -4.1, -2.7, -1.2, 3.0),
+    y = 24,
+    labels = c(
+        "Dataset title",
+        "Protocol",
+        "Crowdsourced",
+        "Simulated",
+        "Effect Size (Cohen's d) and 95% CI"
+    ),
+    font = 2,
+    family = 'serif',
+    cex = .9
+)
+
+
 
 ## ANOVA for AUC across different predictors
 
@@ -786,7 +827,6 @@ t_neat(metdat$aucs[metdat$version == 'p_vs_i'],
 t.test(metdat$aucs[metdat$version == 'p_vs_i'],
        metdat$aucs[metdat$version == 'simulated'], paired = T)
 
-
 corr_neat(metdat$aucs[metdat$version == "p_vs_i"], metdat$aucs[metdat$version == "simulated"])
 
 weights::wtd.cor(metdat$aucs[metdat$version == "p_vs_i"], metdat$aucs[metdat$version == "simulated"], weight = (sd_metdat$n_g[sd_metdat$version == "p_vs_i"]+sd_metdat$n_i[sd_metdat$version == "p_vs_i"]))
@@ -802,7 +842,9 @@ bayes_model = metaBMA::meta_random(
     labels = study,
     data = met_stat
 )
-bayes_model$BF
+
+bayes_model$stanfit_dstudy
+plot_posterior
 
 bayes_model_without = metaBMA::meta_random(
     y = cohens_d~multiple_single+crowdsourced,
