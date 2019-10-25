@@ -19,6 +19,8 @@ library(BayesFactor)
 library(pROC)
 library(neatStats)
 library(esc)
+library("openxlsx")
+
 
 add_figs = TRUE # takes time
 add_figs = FALSE
@@ -46,6 +48,44 @@ Data_NV <- read_tsv("Oddball Ernst PP 1- 43 FINAL.txt") # Noordraven & Verschuer
 Data_KV21 <- read_tsv("rawdata_Exp1.txt") # Kleinberg & Verschuere (2016) Study 1 https://osf.io/c7w5v/
 Data_KV22 <- read_tsv("rawdata_Exp2.txt") # Kleinberg & Verschuere (2016) Study 2 https://osf.io/c7w5v/
 
+# Geven, Ben-Shakhar, Kindt, & Verschuere (2018)
+Data_GBKV1 <- read.xlsx("Geven_CheatingRT_1.xlsx", sheet = 1)
+Data_GBKV2 <- read.xlsx("Geven_CheatingRT_2.xlsx", sheet = 1)
+Data_GBKV3 <- read_tsv("Geven_CheatingRT_3.iqdat")
+Data_GBKV4 <- read_tsv("Geven_CheatingRT_4.iqx")
+
+Data_GBKVbase = rbind(Data_GBKV1, Data_GBKV2, Data_GBKV3, Data_GBKV4)
+Data_GBKVbase = Data_GBKVbase[, c(
+    'subject',
+    'blocknum',
+    'trialnum',
+    'blockcode',
+    'trialcode',
+    'correct',
+    'latency',
+    'stimulusitem1'
+)]
+
+Data_GBKV = Data_GBKVbase[sapply(strsplit(Data_GBKVbase$stimulusitem1, " "), length) == 2 &
+                              (!grepl('leerfase', Data_GBKVbase$blockcode, fixed = TRUE)) &
+                              (!grepl('practice', Data_GBKVbase$blockcode, fixed = TRUE)),]
+
+
+Data_GBKV_excl <- read_sav("Geven_Inquisit_Final.sav")
+Data_GBKV_excl = Data_GBKV_excl[Data_GBKV_excl$Exclusions_CIT == 0 &
+                                    Data_GBKV_excl$Exclusions_HEXACO == 0 &
+                                    Data_GBKV_excl$Exclusions_News_CarrieFisher == 0 &
+                                    Data_GBKV_excl$ExclusionGround == "" &
+                                    Data_GBKV_excl$Condition %in% c(1,2,4), ]
+Data_GBKV_excl$subject = substring(Data_GBKV_excl$ParticipantNumber, 2)
+Data_GBKV_dems = Data_GBKV_excl[, c(
+    'subject',
+    'Age',
+    'Gender',
+    'Condition'
+)]
+Data_GBKV = Data_GBKV[Data_GBKV$subject %in% Data_GBKV_excl$subj,]
+Data_GBKV = merge(Data_GBKV, Data_GBKV_dems, by = "subject")
 
 ########################
 #  Unify &             #
@@ -142,6 +182,26 @@ Data_KV22 <- Data_KV22 %>%
            study = "Kleinberg & Verschuere (2016) Exp2",
            dataset = "dataset 4")
 Data_KV22 = Data_KV22[,required_cols]
+
+names(Data_GBKV)
+Data_GBKV <- Data_GBKV %>%
+    mutate(id = subject,
+           date = NA,
+           multiple_single = 1, # 1 = multiple, 0 = single
+           cond = ifelse(Condition == 2, 0, 1 ), # here we set 1 & 4 to guilty (=1) and 2 to innocent
+           rt = latency,
+           type = trialcode,
+           corr = correct,
+           study = "Geven, Ben-Shakhar, Kindt, & Verschuere (2018)",
+           dataset = "dataset 12",
+           age = Age,
+           gender = Gender,
+           stim = stimulusitem1,
+           trial = trialnum)
+Data_GBKV = Data_GBKV[,required_cols]
+Data_GBKV$type[Data_GBKV$type == "real_PROBE"] = "probe"
+Data_GBKV$type[Data_GBKV$type == "real_TARGET"] = "target"
+Data_GBKV$type[Data_GBKV$type == "real_IRRELEVANT"] = "irrelevant"
 
 # join them all together
 # joining unfortunately only takes 2 arguments but it has other benefits so its nicer this way
@@ -241,7 +301,7 @@ for (i in dsets[order(nchar(dsets), dsets)]) {
 
 
   p_i_guilty = filter(dat_i_prep, cond == 1)$p_vs_i
-  sd_i <- sd(p_i_guilty) #* 0.5077 + 7.1245
+  sd_i <- sd(p_i_guilty) * 0.5077 + 7.1245
   # sd_i <- 0.894
 
   # Get the cohens d and stuff
