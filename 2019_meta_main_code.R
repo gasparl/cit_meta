@@ -84,7 +84,7 @@ Data_GBKV_dems = Data_GBKV_excl[, c(
     'Gender',
     'Condition'
 )]
-Data_GBKV = Data_GBKV[Data_GBKV$subject %in% Data_GBKV_excl$subj,]
+Data_GBKV = Data_GBKV[Data_GBKV$subject %in% Data_GBKV_excl$subject,]
 Data_GBKV = merge(Data_GBKV, Data_GBKV_dems, by = "subject")
 
 ########################
@@ -183,7 +183,6 @@ Data_KV22 <- Data_KV22 %>%
            dataset = "dataset 4")
 Data_KV22 = Data_KV22[,required_cols]
 
-names(Data_GBKV)
 Data_GBKV <- Data_GBKV %>%
     mutate(id = subject,
            date = NA,
@@ -214,6 +213,7 @@ Data_joined <- full_join(Data_joined, Data_NV)
 Data_joined <- full_join(Data_joined, select(Data_KV21,-date)) # date problem again
 Data_joined$id = as.character(Data_joined$id) # gotto convert it because last one is char
 Data_joined <- full_join(Data_joined, select(Data_KV22,-date)) # date problem again
+Data_joined <- full_join(Data_joined, select(Data_GBKV,-date))
 dsets = unique(Data_joined$dataset)
 
 # saveRDS(Data_joined, file="2019_meta_data_trial_level.Rds")
@@ -232,7 +232,7 @@ l_fig_sim = list()
 
 for (i in dsets[order(nchar(dsets), dsets)]) {
     # i = "dataset 7" # filler
-    # i = "dataset 5"
+    # i = "dataset 12"
   dat_i <- filter(Data_joined, dataset == i) # select the current data set
 
   study_i <- dat_i$study[1]
