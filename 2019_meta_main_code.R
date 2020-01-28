@@ -37,6 +37,10 @@ source("2019_meta_functions.R")
 #                      #
 ########################
 
+
+##### the code below records the full original data processing code
+##### to use the uploaded data, skip to the section "USING cit_meta_data_trial_level.Rda"
+
 setwd(path_neat("data"))
 
 Data_VKT <- read_sav("Experiment2_Data_SPSSformat.sav") # Verschuere, Kleinberg, & Theocharidou (2015) SP/MP https://osf.io/kgum2/
@@ -102,26 +106,26 @@ Data_VKT <- Data_VKT %>%
         cond = ifelse(is.even(cond), 1, 0),
         # here we set 0 & 2 to guilty (=1) and 1 & 3 to innocent (=0),
         study = "Verschuere, Kleinberg, & Theocharidou (2015) Exp2",
-        dataset = ifelse(multiple_single == 0, "dataset 11", "dataset 10")
+        dataset = ifelse(multiple_single == 0, "dataset 12", "dataset 11")
     )
 
 
 Data_KV1 <- Data_KV1 %>%
             mutate(multiple_single = 1, # 1 = multiple, 0 = single
             study = "Kleinberg & Verschuere (2015) Exp1",
-            dataset = "dataset 1",
+            dataset = "dataset 2",
             cohd = as.numeric(cohd)) #for some reason cohens d is a charachter here which leads to issues with joining
 
 Data_KV2 <- Data_KV2 %>%
              mutate(multiple_single = 1, # 1 = multiple, 0 = single
              study = "Kleinberg & Verschuere (2015) Exp2",
-             dataset = "dataset 2")
+             dataset = "dataset 3")
 
 Data_VK <- Data_VK %>%
            mutate(multiple_single = 1, # 1 = multiple, 0 = single
            stim = paste(cat, type, sep = "_"),
            study = "Verschuere & Kleinberg (2015)",
-           dataset = "dataset 9")
+           dataset = "dataset 10")
 
 Data_LKV <- Data_LKV %>%
     mutate(
@@ -134,8 +138,8 @@ Data_LKV <- Data_LKV %>%
         cond = ifelse(cond < 3, 1, 0),
         # here we set 0, 1, 2 to guilty (=1) and 3, 4, 5 to innocent (=0),
         study = 'Lukács, Kleinberg, & Verschuere (2017) Exp1',
-        dataset = ifelse(multiple_single == 0, "dataset 6", "dataset 5"),
-        dataset = ifelse(multiple_single == 2, "dataset 7", dataset)
+        dataset = ifelse(multiple_single == 0, "dataset 7", "dataset 6"),
+        dataset = ifelse(multiple_single == 2, "dataset 8", dataset)
     )
 
 required_cols = c("id", "date", "cond", "rt", "type", "corr", "multiple_single", "study", "dataset", "age", "gender", "stim", "trial") # this is all the data we need
@@ -157,7 +161,7 @@ Data_NV$type[grepl('^target', Data_NV$trialcode)] = "target"
 Data_NV <- Data_NV %>%
     mutate(multiple_single = 1, # 1 = multiple, 0 = single
            study = "Noordraven & Verschuere (2013)",
-           dataset = "dataset 8",
+           dataset = "dataset 9",
            trial = as.numeric(trialnum),
            age = 99, # just filler, no need for this now
            gender = 9, # just filler, no need for this now
@@ -171,16 +175,15 @@ Data_KV21 <- Data_KV21 %>%
     mutate(multiple_single = 1, # 1 = multiple, 0 = single
            cond = ifelse(cond == 1, 0, 1 ), # here we set 0 & 2 to guilty (=1) and 1 to innocent (=0),
            study = "Kleinberg & Verschuere (2016) Exp1",
-           dataset = "dataset 3")
+           dataset = "dataset 4")
 Data_KV21 = Data_KV21[,required_cols]
 
-Data_KV22$trial = as.numeric(seq(nrow(Data_KV22))) # has no trial column, so i create it artificially
 Data_KV22 <- Data_KV22 %>%
     mutate(multiple_single = 1, # 1 = multiple, 0 = single
            cond = ifelse(cond == 0, 0, 1 ), # here we set 1 & 2 & 3 to guilty (=1) and 0 to innocent (remains 0), ,
            id = paste0(date, age, lang, cohd), # for some reason it has no ids; so i create one
            study = "Kleinberg & Verschuere (2016) Exp2",
-           dataset = "dataset 4")
+           dataset = "dataset 5")
 Data_KV22 = Data_KV22[,required_cols]
 
 Data_GBKV <- Data_GBKV %>%
@@ -192,7 +195,7 @@ Data_GBKV <- Data_GBKV %>%
            type = trialcode,
            corr = correct,
            study = "Geven, Ben-Shakhar, Kindt, & Verschuere (2018)",
-           dataset = "dataset 12",
+           dataset = "dataset 1",
            age = Age,
            gender = Gender,
            stim = stimulusitem1,
@@ -214,9 +217,31 @@ Data_joined <- full_join(Data_joined, select(Data_KV21,-date)) # date problem ag
 Data_joined$id = as.character(Data_joined$id) # gotto convert it because last one is char
 Data_joined <- full_join(Data_joined, select(Data_KV22,-date)) # date problem again
 Data_joined <- full_join(Data_joined, select(Data_GBKV,-date))
-dsets = unique(Data_joined$dataset)
 
-# saveRDS(Data_joined, file="2019_meta_data_trial_level.Rds")
+# reorganize and save
+# cit_meta_data_trial_level = Data_joined
+# cit_meta_data_trial_level = cit_meta_data_trial_level[c('study', 'cond','multiple_single', 'id','block','dataset','trial','type','corr','rt','stim', 'isi','age','gender')]
+# names(cit_meta_data_trial_level) = c('study', 'condition','multiple_single', 'subject_id','block','dataset','trial','type','correct','rt','stimulus', 'isi','age','gender')
+#
+# cit_meta_data_trial_level$subject_id = paste0(cit_meta_data_trial_level$subject_id, cit_meta_data_trial_level$dataset, cit_meta_data_trial_level$condition, cit_meta_data_trial_level$multiple_single, cit_meta_data_trial_level$age)
+# anon <- function(x) {
+#     rl <- rle(x)$lengths
+#     ans<- paste0("id", rep(seq_along(rl), rl))
+#     return(ans)
+# }
+# cit_meta_data_trial_level$subject_id <- anon(cit_meta_data_trial_level$subject_id)
+# # unique(full_out$subject_id)
+#
+# save(cit_meta_data_trial_level, file="cit_meta_data_trial_level.Rda")
+
+
+##### USING cit_meta_data_trial_level.Rda
+
+load("cit_meta_data_trial_level.Rda")
+names(cit_meta_data_trial_level) = c('study', 'cond','multiple_single', 'id','block','dataset','trial','type','corr','rt','stim', 'isi','age','gender')
+Data_joined = cit_meta_data_trial_level
+
+dsets = unique(Data_joined$dataset)
 
 # length(unique(paste(Data_joined$dataset, Data_joined$id, Data_joined$age, Data_joined$cond)))
 # Data_joined_probe = Data_joined[Data_joined$type == 'probe',]
@@ -230,8 +255,9 @@ count <- 0
 l_fig_real = list()
 l_fig_sim = list()
 
+stat_dat = stat_dat[order(as.character(stat_dat$study)),]
+
 for (i in dsets[order(nchar(dsets), dsets)]) {
-    # i = "dataset 7" # filler
     # i = "dataset 12"
   dat_i <- filter(Data_joined, dataset == i) # select the current data set
 
