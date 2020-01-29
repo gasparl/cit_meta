@@ -237,15 +237,17 @@ Data_joined <- full_join(Data_joined, select(Data_GBKV,-date))
 
 ##### USING cit_meta_data_trial_level.Rda
 
+setwd(path_neat('data'))
 load("cit_meta_data_trial_level.Rda")
 names(cit_meta_data_trial_level) = c('study', 'cond','multiple_single', 'id','block','dataset','trial','type','corr','rt','stim', 'isi','age','gender')
 Data_joined = cit_meta_data_trial_level
 
 dsets = unique(Data_joined$dataset)
 
-# length(unique(paste(Data_joined$dataset, Data_joined$id, Data_joined$age, Data_joined$cond)))
-# Data_joined_probe = Data_joined[Data_joined$type == 'probe',]
-# length(unique(paste(Data_joined_probe$dataset, Data_joined_probe$id, Data_joined_probe$age, Data_joined_probe$cond, Data_joined_probe$id, Data_joined_probe$stim)))
+# length(unique(paste(cit_meta_data_trial_level$dataset, cit_meta_data_trial_level$id, cit_meta_data_trial_level$age, cit_meta_data_trial_level$cond)))
+# cit_meta_data_trial_level_probe = cit_meta_data_trial_level[cit_meta_data_trial_level$type == 'probe',]
+# length(unique(paste(cit_meta_data_trial_level_probe$dataset, cit_meta_data_trial_level_probe$id, cit_meta_data_trial_level_probe$age, cit_meta_data_trial_level_probe$cond, cit_meta_data_trial_level_probe$id, cit_meta_data_trial_level_probe$stim)))
+
 
 # now we loop through the Data
 set.seed(100)
@@ -254,8 +256,6 @@ roc_metdat <- tibble()
 count <- 0
 l_fig_real = list()
 l_fig_sim = list()
-
-stat_dat = stat_dat[order(as.character(stat_dat$study)),]
 
 for (i in dsets[order(nchar(dsets), dsets)]) {
     # i = "dataset 12"
@@ -325,9 +325,8 @@ for (i in dsets[order(nchar(dsets), dsets)]) {
       cond = dat_i_prep$cond
   )
 
-
   p_i_guilty = filter(dat_i_prep, cond == 1)$p_vs_i
-  sd_i <- sd(p_i_guilty) * 0.5077 + 7.1245
+  sd_i <- sd(p_i_guilty) * 0.51 + 7.08
   # sd_i <- 0.894
 
   # Get the cohens d and stuff
@@ -388,15 +387,15 @@ for (i in dsets[order(nchar(dsets), dsets)]) {
 
 ## --- FIGURES
 
-# library("ggpubr")
-# fig_lists = c(l_fig_real, l_fig_sim)
-# bigfig = ggpubr::ggarrange(plotlist = fig_lists, common.legend = TRUE, ncol = 11, nrow = 2)
-# annotate_figure(
-#     bigfig,
-#     top = text_grob("Density plots per each study", face = "bold", size = 14),
-#     bottom = text_grob("probe-irrelevant differences (ms)"),
-#     left = text_grob("density estimate", rot = 90)
-# )
+library("ggpubr")
+fig_lists = c(l_fig_real, l_fig_sim)
+bigfig = ggpubr::ggarrange(plotlist = fig_lists, common.legend = TRUE, ncol = 12, nrow = 2, labels = c(paste(1:12, 'real'), paste(1:12, 'sim')), label.x = 0.17 )
+annotate_figure(
+    bigfig,
+    top = text_grob("Density plots per each dataset, real and simulated", face = "bold", size = 14),
+    bottom = text_grob("probe-irrelevant differences (ms)"),
+    left = text_grob("density estimate", rot = 90)
+)
 
 
 ## --- Standard Deviations
@@ -406,12 +405,12 @@ stat_dat = sd_metdat[sd_metdat$version == "p_vs_i",]
 
 mean(stat_dat$m_g)
 mean(stat_dat$sd_g)
-mean_ci(stat_dat$sd_g, distance_only = F)
+neatStats::mean_ci(stat_dat$sd_g, distance_only = F)
 g_sd_max = max(stat_dat$sd_g)
 g_sd_min = min(stat_dat$sd_g)
 #mean(stat_dat$m_i)
 mean(stat_dat$sd_i)
-mean_ci(stat_dat$sd_i, distance_only = F)
+neatStats::mean_ci(stat_dat$sd_i, distance_only = F)
 i_sd_max = max(stat_dat$sd_i)
 i_sd_min = min(stat_dat$sd_i)
 
@@ -419,9 +418,8 @@ i_sd_min = min(stat_dat$sd_i)
 # t.test(stat_dat$sd_i, mu = 0.894)
 
 #stat_dat = stat_dat[stat_dat$dataset != 9, ]
+t_neat(stat_dat$sd_g, stat_dat$sd_i, pair = T, round_descr = 1)
 corr_neat(stat_dat$sd_g, stat_dat$sd_i)
-t_neat(stat_dat$sd_g, stat_dat$sd_i, pair = T)
-t.test(stat_dat$sd_g, stat_dat$sd_i, paired = T)
 weights::wtd.cor(stat_dat$sd_g, stat_dat$sd_i, weight = (stat_dat$n_g+stat_dat$n_i))
 
 model = lm(sd_i~sd_g, data = stat_dat)
@@ -430,16 +428,14 @@ model = lm(sd_i~sd_g, data = stat_dat, weights = (stat_dat$n_g+stat_dat$n_i))
 summary(model)
 
 stat_dat$sd_sim2 = stat_dat$sd_g * model$coefficients[2] + model$coefficients[1]
-# weighted: 0.5077 + 7.1245
-# unweighed: 0.4418+8.3898
+# weighted: 0.5112 + 7.0784
+# unweighed: 0.4528 + 8.1529
 #stat_dat$sd_sim2 = stat_dat$sd_g * 0.52479 +0.16970
 stat_dat$sd_sim3 = stat_dat$sd_g
 
 t_neat( stat_dat$sd_i, stat_dat$sd_sim2, pair = T )
 t_neat( stat_dat$sd_i, stat_dat$sd_sim3, pair = T )
 t_neat( stat_dat$sd_i, stat_dat$sd_sim3, pair = T )
-
-
 
 ggplot(stat_dat, aes(
     x = sd_g,
@@ -498,11 +494,11 @@ accs_cv = NULL
 for (pred_type in c("p_vs_i", "d_cit", "d_cit_pooled", "p_vs_i_scaled_items")) {
     met_thres = metdat[metdat$version == pred_type, ]
 
-    for (stud in unique(met_thres$study)) {
-        thres_orig = met_thres$thresholds[met_thres$study == stud]
-        thres_mean = mean(met_thres$thresholds[met_thres$study != stud])
-        thres_median = median(met_thres$thresholds[met_thres$study != stud])
-        preds_stud = preds_metdat[preds_metdat$study == stud, ]
+    for (stud in unique(met_thres$dataset)) {
+        thres_orig = met_thres$thresholds[met_thres$dataset == stud]
+        thres_mean = mean(met_thres$thresholds[met_thres$dataset != stud])
+        thres_median = median(met_thres$thresholds[met_thres$dataset != stud])
+        preds_stud = preds_metdat[preds_metdat$dataset == stud, ]
         preds_guilty = preds_stud[[pred_type]][preds_stud$cond == 1]
         preds_innocent = preds_stud[[pred_type]][preds_stud$cond == 0]
         tpr = length(preds_guilty[preds_guilty > thres_orig]) / length(preds_guilty)
@@ -517,17 +513,17 @@ for (pred_type in c("p_vs_i", "d_cit", "d_cit_pooled", "p_vs_i_scaled_items")) {
         tnr_med = length(preds_innocent[preds_innocent < thres_median]) / length(preds_innocent)
         acc_med = (tpr_med + tnr_med) / 2
         new_accs_cv = data.frame(
-            study = stud,
+            dataset = stud,
             version = pred_type,
             acc_orig = acc,
             acc_cv_mean = acc_mean,
             acc_cv_med = acc_med,
-            TPs_orig = tnr,
-            TNs_orig = tpr,
-            TPs_cv_mean = tnr_mean,
-            TNs_cv_mean = tpr_mean,
-            TPs_cv_med = tnr_med,
-            TNs_cv_med = tpr_med
+            TPs_orig = tpr,
+            TNs_orig = tnr,
+            TPs_cv_mean = tpr_mean,
+            TNs_cv_mean = tnr_mean,
+            TPs_cv_med = tpr_med,
+            TNs_cv_med = tnr_med
         )
         if (is.null(accs_cv)) {
             accs_cv = new_accs_cv
@@ -554,7 +550,7 @@ accs_cv_for_aov$version = as.character(accs_cv_for_aov$version)
 accs_cv_for_aov$version[accs_cv_for_aov$version == 'p_vs_i'] = 'p_vs_i_basic'
 accs_cv_wide = reshape(
     as.data.frame(accs_cv_for_aov[accs_cv_for_aov$version %in% c("p_vs_i_basic", "d_cit_pooled", "p_vs_i_scaled_items"), c(
-        "study",
+        "dataset",
         'version',
         'acc_orig',
         'acc_cv_mean',
@@ -566,7 +562,7 @@ accs_cv_wide = reshape(
         'TNs_cv_mean',
         'TNs_cv_med'
     )]),
-    idvar = "study",
+    idvar = "dataset",
     timevar = "version",
     direction = "wide"
 )
@@ -590,9 +586,9 @@ anova_neat(
         'TNs_cv_mean.p_vs_i_scaled_items'
     ),
     within_ids = list(
-        orig_vs_cv = c('_orig', '_mean'),
-        acc_type = c('TPs_', 'TNs_'),
-        pred_type = c('p_vs_i_basic', 'd_cit_pooled', 'p_vs_i_scaled_items')
+        Cutoff = c('_orig', '_mean'),
+        Condition = c('TPs_', 'TNs_'),
+        Predictor = c('p_vs_i_basic', 'd_cit_pooled', 'p_vs_i_scaled_items')
     )
 )
 
@@ -655,9 +651,9 @@ anova_neat(
         'TNs_cv_med.p_vs_i_scaled_items'
     ),
     within_ids = list(
-        orig_vs_cv = c('_orig', '_med'),
-        acc_type = c('TPs_', 'TNs_'),
-        pred_type = c('p_vs_i_basic', 'd_cit_pooled', 'p_vs_i_scaled_items')
+        Cutoff = c('_orig', '_med'),
+        Condition = c('TPs_', 'TNs_'),
+        Predictor = c('p_vs_i_basic', 'd_cit_pooled', 'p_vs_i_scaled_items')
     )
 )
 plot_neat(
@@ -680,8 +676,23 @@ plot_neat(
         orig_vs_cv = c('_orig', '_med'),
         acc_type = c('TPs_', 'TNs_'),
         pred_type = c('p_vs_i_basic', 'd_cit_pooled', 'p_vs_i_scaled_items')
-    ), eb_method = sd, type = "bar", panel = 'acc_type'
-)
+    ), eb_method = sd, type = "bar", panel = 'acc_type',
+    factor_names = c(orig_vs_cv = 'Cutoff', pred_type = ''),
+    value_names = c(
+        p_vs_i_basic = 'MPID',
+        p_vs_i_scaled_items = 'SPRT',
+        d_cit_pooled = 'SPID',
+        '_orig' = 'Optimal',
+        '_med' = 'Inferred',
+        TPs_ = 'True positive rate',
+        TNs_ = 'True negative rate'
+    )
+) + theme(text = element_text(size = 21)) + scale_y_continuous(breaks = c(
+    "0" = 0,
+    ".25" = 0.25,
+    ".50" = 0.5,
+    ".75" = 0.75
+))
 # follow-up for medians
 anova_neat(
     accs_cv_wide,
@@ -882,13 +893,13 @@ met_stat_wide = data.frame(met_stat)
 met_stat_wide$version[met_stat_wide$version == 'p_vs_i'] = 'p_vs_i_basic'
 met_stat_wide = reshape(
     as.data.frame(met_stat_wide[met_stat_wide$version %in% c("p_vs_i_basic", "d_cit_pooled", "p_vs_i_scaled_items", "simulated"), c(
-        "study",
+        "dataset",
         'version',
         'aucs',
         'auc_lower',
         'auc_upper'
     )]),
-    idvar = "study",
+    idvar = "dataset",
     timevar = "version",
     direction = "wide"
 )
@@ -906,12 +917,10 @@ anova_neat(
 
 ## t-test for AUC between simulated and real
 
-t_neat(metdat$aucs[metdat$version == 'p_vs_i'],
-       metdat$aucs[metdat$version == 'simulated'],
+t_neat(metdat$aucs[metdat$version == 'simulated'],
+       metdat$aucs[metdat$version == 'p_vs_i'],
        pair = T,
        round_descr = 3)
-t.test(metdat$aucs[metdat$version == 'p_vs_i'],
-       metdat$aucs[metdat$version == 'simulated'], paired = T)
 
 corr_neat(metdat$aucs[metdat$version == "p_vs_i"], metdat$aucs[metdat$version == "simulated"])
 
@@ -975,3 +984,28 @@ roc_met = roc_met[,c('TP', 'FP', 'FN', 'TN', 'simulated', 'multiple_single', 'Au
 # roc_results = metaROC(roc_met, plot.Author=TRUE, model="random-effects")
 
 
+### JOINT TABLES
+
+unique(out_aucs$version)
+unique(out_descriptives$version)
+unique(out_main$version)
+names(out_aucs)
+
+out_main = metdat
+out_descriptives = sd_metdat
+out_aucs = accs_cv
+out_main = out_main[out_main$version %in% c("d_cit_pooled", "p_vs_i_scaled_items", "p_vs_i", "simulated"), !(names(out_main) %in% c("eff_p_i_control"))]
+out_aucs = out_aucs[out_aucs$version %in% c("d_cit_pooled", "p_vs_i_scaled_items", "p_vs_i", "simulated"),  !(names(out_aucs) %in% c("eff_p_i_control"))]
+
+out_main$crowdsourced = "Yes"
+out_main$crowdsourced[grepl( "Noordraven & Verschuere", out_main$study )] = "No"
+out_main$crowdsourced[grepl( "Verschuere & Kleinberg (2015)", out_main$study, fixed = T )] = "No"
+
+out_full = merge(out_main, out_descriptives, all = TRUE)
+out_full = merge(out_full, out_aucs, all = TRUE)
+
+# save(out_full, file="cit_meta_data_aggregated_EQUAL_SIM_SAMPLE.Rda")
+
+out_full_10000 = out_full
+
+# save(out_full_10000, file="cit_meta_data_aggregated_10000_SIM_SAMPLE.Rda")
