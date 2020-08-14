@@ -1,5 +1,5 @@
 cohen_d_between = function(outcome, categ, for_table = T){
-  e = t.test(outcome ~ categ)
+  e = t.test(outcome ~ categ, var.equal = TRUE)
   f = as.vector(e$statistic)
   df = as.vector(e$parameter)
   pvalue = e$p.value
@@ -180,7 +180,8 @@ effectsize_data = function(id,
                            cond,
                            multiple_single,
                            study,
-                           sd_sim) {
+                           sd_sim,
+                           equal_n) {
 
 
 
@@ -212,20 +213,21 @@ effectsize_data = function(id,
 
     # Because of the way the cohens_d works I add them in a data frame with the guilty ones immediately
     # set.seed(100) # unnecessary; we'll always create perfect normal distributions
+    if (equal_n == TRUE) {
+      my_n = length(Data_Real$p_vs_i[Data_Real$cond == 0])
+    } else {
+      my_n = 10000
+    }
     Data_Sim <-
-        full_join (
-            tibble(
-                cond = 0,
-                p_vs_i = bayestestR::distribution_normal(
-                    n = length(Data_Real$p_vs_i[Data_Real$cond == 0]),
-                    #n = 10000,
-                    mean =
-                        0,
-                    sd = sd_sim
-                )
-            ),
-            filter(Data_Real, cond == 1)
-        )  # multiple
+      full_join (
+        tibble(
+          cond = 0,
+          p_vs_i = bayestestR::distribution_normal(n = my_n,
+                                                   mean = 0,
+                                                   sd = sd_sim)
+        ),
+        filter(Data_Real, cond == 1)
+      )  # multiple
 
     testData_Real <<- Data_Real
     # Data_Real = testData_Real

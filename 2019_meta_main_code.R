@@ -13,7 +13,7 @@ options(scipen=999)
 library(metafor)
 library(schoolmath)
 library(MBESS)
-library(nsROC)
+# library(nsROC)
 library(bayestestR)
 library(BayesFactor)
 library(pROC)
@@ -21,9 +21,6 @@ library(neatStats)
 library(esc)
 library("openxlsx")
 
-
-add_figs = TRUE # takes time
-add_figs = FALSE
 
 # Set working directory
 setwd(path_neat())
@@ -47,7 +44,7 @@ Data_VKT <- read_sav("Experiment2_Data_SPSSformat.sav") # Verschuere, Kleinberg,
 Data_KV1 <- read_sav("MemoryDetection2_0_Study1_rawdata_SPSS.sav") # Kleinberg & Verschuere (2015) Study 1 https://osf.io/5htyr/
 Data_KV2 <- read_sav("MemoryDetection2_0_Study2_rawdata_SPSS.sav") # Kleinberg & Verschuere (2015) Study 2 https://osf.io/5htyr/
 Data_VK <-  read_sav("rawdata_online-id-check.sav") # Verschuere & Kleinberg (2015) https://osf.io/cg5es/
-Data_LKV <- read_tsv("Experiment1_data.txt") # Lukács, Kleinberg, & Verschuere (2017) MP/SP/SPF https://osf.io/kv65n/
+Data_LKV <- read_tsv("Experiment1_data.txt") # Luk?cs, Kleinberg, & Verschuere (2017) MP/SP/SPF https://osf.io/kv65n/
 Data_NV <- read_tsv("Oddball Ernst PP 1- 43 FINAL.txt") # Noordraven & Verschuere (2013)
 Data_KV21 <- read_tsv("rawdata_Exp1.txt") # Kleinberg & Verschuere (2016) Study 1 https://osf.io/c7w5v/
 Data_KV22 <- read_tsv("rawdata_Exp2.txt") # Kleinberg & Verschuere (2016) Study 2 https://osf.io/c7w5v/
@@ -137,7 +134,7 @@ Data_LKV <- Data_LKV %>%
         # 2 means inducer
         cond = ifelse(cond < 3, 1, 0),
         # here we set 0, 1, 2 to guilty (=1) and 3, 4, 5 to innocent (=0),
-        study = 'Lukács, Kleinberg, & Verschuere (2017) Exp1',
+        study = 'Luk?cs, Kleinberg, & Verschuere (2017) Exp1',
         dataset = ifelse(multiple_single == 0, "dataset 7", "dataset 6"),
         dataset = ifelse(multiple_single == 2, "dataset 8", dataset)
     )
@@ -257,12 +254,15 @@ count <- 0
 l_fig_real = list()
 l_fig_sim = list()
 
+add_figs = TRUE # takes time
+add_figs = FALSE
+
 for (i in dsets[order(nchar(dsets), dsets)]) {
     # i = "dataset 12"
   dat_i <- filter(Data_joined, dataset == i) # select the current data set
 
   study_i <- dat_i$study[1]
-  cat("------------ started ", i, ": ", study_i, fill = T)
+  cat("\n------------ started ", i, ": ", study_i, fill = T)
 
   #prep the data
   dat_i_prep <- dat_prep(dat_i$id,dat_i$gender,dat_i$age,dat_i$stim,dat_i$trial,
@@ -331,20 +331,21 @@ for (i in dsets[order(nchar(dsets), dsets)]) {
 
   # Get the cohens d and stuff
   eff_data <-
-      effectsize_data(
-          dat_i_prep$id,
-          dat_i_prep$p_vs_i,
-          dat_i_prep$d_cit,
-          dat_i_prep$d_cit_pooled,
-          dat_i_prep$p_i_diff_pertrial_scaled,
-          dat_i_prep$d_cit_perstim,
-          dat_i_prep$p_vs_i_scaled_items,
-          dat_i_prep$cond,
-          dat_i_prep$multiple_single,
-          dat_i_prep$study,
-          sd_i
-      )
-
+    effectsize_data(
+      dat_i_prep$id,
+      dat_i_prep$p_vs_i,
+      dat_i_prep$d_cit,
+      dat_i_prep$d_cit_pooled,
+      dat_i_prep$p_i_diff_pertrial_scaled,
+      dat_i_prep$d_cit_perstim,
+      dat_i_prep$p_vs_i_scaled_items,
+      dat_i_prep$cond,
+      dat_i_prep$multiple_single,
+      dat_i_prep$study,
+      sd_i,
+      equal_n = TRUE # true for equal N, false for 10000
+    )
+  
   met_dat_i = eff_data[[1]]
   met_dat_i$dataset = datnum
   l_fig_real[[datnum]] = eff_data[[2]]
@@ -925,35 +926,6 @@ t_neat(metdat$aucs[metdat$version == 'simulated'],
 corr_neat(metdat$aucs[metdat$version == "p_vs_i"], metdat$aucs[metdat$version == "simulated"])
 
 weights::wtd.cor(metdat$aucs[metdat$version == "p_vs_i"], metdat$aucs[metdat$version == "simulated"], weight = (sd_metdat$n_g[sd_metdat$version == "p_vs_i"]+sd_metdat$n_i[sd_metdat$version == "p_vs_i"]))
-
-
-## BF META
-
-#install.packages('metaBMA')
-
-bayes_model = metaBMA::meta_random(
-    y = cohens_d~version+multiple_single+crowdsourced,
-    SE = sed,
-    labels = study,
-    data = met_stat
-)
-
-bayes_model$stanfit_dstudy
-plot_posterior
-
-bayes_model_without = metaBMA::meta_random(
-    y = cohens_d~multiple_single+crowdsourced,
-    SE = sed,
-    labels = study,
-    data = met_stat
-)
-bayes_model_without$BF
-
-metaBMA::plot_forest(bayes_model)
-
-metaBMA::inclusion(list(bayes_model, bayes_model_without))
-
-bayes_model$posterior_models
 
 
 ## ROC
