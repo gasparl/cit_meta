@@ -6,7 +6,7 @@ load("prevs/cit_meta_data_aggregated_10000_SIM_SAMPLE.Rda")
 
 names(out_full_10000)
 
-out_full_10000 = out_full_10000[out_full_10000$version == "simulated", ]
+out_full_10000 = out_full_10000[out_full_10000$version == "simulated",]
 out_full_10000 = out_full_10000[colSums(!is.na(out_full_10000)) > 0]
 out_full_10000$multiple_single = NULL
 out_full_10000$crowdsourced = NULL
@@ -77,36 +77,43 @@ cit_meta_data_aggregated = out_full_both[c(
     'acc_cv_med',
     # overall classification accuracy using the MEDIAN of optimal threshold of other studies
     'TPs_cv_med',
-    'TNs_cv_med',
-    'aucs_n10000',
+    'TNs_cv_med'
+    #'aucs_n10000',
     # same as above, but with 10000 simulated datapoints (the previous columns contain simulated datapoints equal to the real control sample size in the given experimental design)
-    'accuracies_n10000',
-    'thresholds_n10000',
-    'TNs_n10000',
-    'TPs_n10000'
+    #'accuracies_n10000',
+    #'thresholds_n10000',
+    #'TNs_n10000',
+    #'TPs_n10000'
 )]
+
 
 cat(names(cit_meta_data_aggregated), sep = "', '")
 
 save(cit_meta_data_aggregated, file = "cit_meta_data_aggregated.Rda")
 
 ##########
-
+setwd(path_neat())
 load("OSF/cit_meta_data_aggregated.Rda")
 wryt = cit_meta_data_aggregated
 wryt$protocol[wryt$protocol == 'multiple'] = 'MP'
 wryt$protocol[wryt$protocol == 'single'] = 'SP'
 wryt$protocol[wryt$protocol == 'filler'] = 'SPF'
 wryt$study = paste(wryt$study, wryt$protocol)
-wryt$aucs[wryt$predictor == 'p_vs_i_simulated'] = wryt$aucs_n10000[wryt$predictor == 'p_vs_i_simulated']
+#wryt$aucs[wryt$predictor == 'p_vs_i_simulated'] = wryt$aucs_n10000[wryt$predictor == 'p_vs_i_simulated']
 
 cat(names(wryt), sep = "', '")
 cat(names(wryt), sep = "\n")
 
-wryt$cohens_d = ro(wryt$cohens_d, round_to = 2)
-wryt$variance_d = ro(wryt$variance_d, round_to = 2)
+all_means = as.data.frame(sapply(wryt, function(x) {
+    tapply(x, wryt$predictor, mean)
+}))
+all_means$study = 'Mean'
+all_means$dataset = 'Mean'
+all_means$predictor = row.names(all_means)
 
-wryt$cohens_d = ro(wryt$cohens_d , round_to = 2)
+wryt = rbind(wryt,all_means)
+
+wryt$cohens_d = ro(wryt$cohens_d, round_to = 2)
 wryt$variance_d = ro(wryt$variance_d , round_to = 2)
 wryt$sed = ro(wryt$sed , round_to = 2)
 for (pred in unique(wryt$predictor)) {
@@ -124,29 +131,129 @@ for (pred in unique(wryt$predictor)) {
 wryt$aucs = substring(neatStats::ro(wryt$aucs , round_to = 2), 2)
 wryt$auc_lower = substring(neatStats::ro(wryt$auc_lower , round_to = 2), 2)
 wryt$auc_upper = substring(neatStats::ro(wryt$auc_upper , round_to = 2), 2)
+wryt$TPs_orig = substring(neatStats::ro(wryt$TPs_orig , round_to = 2), 2)
+wryt$TNs_orig = substring(neatStats::ro(wryt$TNs_orig , round_to = 2), 2)
+wryt$TPs_cv_mean = substring(neatStats::ro(wryt$TPs_cv_mean , round_to = 2), 2)
+wryt$TNs_cv_mean = substring(neatStats::ro(wryt$TNs_cv_mean , round_to = 2), 2)
 
-wryt$acc_orig = neatStats::ro(wryt$acc_orig , round_to = 2)
-wryt$TPs_orig = neatStats::ro(wryt$TPs_orig , round_to = 2)
-wryt$TNs_orig = neatStats::ro(wryt$TNs_orig , round_to = 2)
-wryt$acc_cv_mean = neatStats::ro(wryt$acc_cv_mean , round_to = 2)
-wryt$TPs_cv_mean = neatStats::ro(wryt$TPs_cv_mean , round_to = 2)
-wryt$TNs_cv_mean = neatStats::ro(wryt$TNs_cv_mean , round_to = 2)
+wryt = data.frame(lapply(wryt, function(x) {
+    gsub("-", "?", x)
+}))
+
+# TABLE 1
 
 table1long = wryt[wryt$predictor != 'p_vs_i_simulated',
-                  c('dataset',
-                    'study',
+                  c('study',
+                    'dataset',
                     'predictor',
                     'n_g',
                     'n_i',
                     'm_g',
-                    'm_i',
                     'sd_g',
+                    'm_i',
                     'sd_i')]
 
-table1 = reshape(
+meta_table1 = reshape(
     table1long,
     timevar = "predictor",
     idvar = c("dataset", "study", 'n_g', 'n_i'),
     direction = "wide",
     sep = "|"
 )
+
+# TABLE 2
+
+table2long = wryt[wryt$predictor != 'p_vs_i_simulated',
+                  c(
+                      'study',
+                      'dataset',
+                      'predictor',
+                      'thresholds',
+                      'TPs_orig',
+                      'TNs_orig',
+                      'TPs_cv_mean',
+                      'TNs_cv_mean'
+                  )]
+
+meta_table2 = reshape(
+    table2long,
+    timevar = "predictor",
+    idvar = c("dataset", "study"),
+    direction = "wide",
+    sep = "|"
+)
+
+
+# TABLE 3
+
+table3long = wryt[, c('study',
+                      'dataset',
+                      'predictor',
+                      'cohens_d',
+                      'aucs')]
+
+meta_table3 = reshape(
+    table3long,
+    timevar = "predictor",
+    idvar = c("dataset", "study"),
+    direction = "wide",
+    sep = "|"
+)
+
+###
+
+write.table(
+    meta_table1,
+    "clipboard",
+    sep = "\t",
+    quote = F,
+    row.names = F
+)
+
+write.table(
+    meta_table2,
+    "clipboard",
+    sep = "\t",
+    quote = F,
+    row.names = F
+)
+
+write.table(
+    meta_table3,
+    "clipboard",
+    sep = "\t",
+    quote = F,
+    row.names = F
+)
+
+
+
+### LINUX
+
+con <- pipe("xclip -selection clipboard -i", open = "w")
+close(con)
+
+write.table(
+    meta_table1,
+    con,
+    sep = "\t",
+    quote = F,
+    row.names = F
+)
+
+write.table(
+    meta_table2,
+    con,
+    sep = "\t",
+    quote = F,
+    row.names = F
+)
+
+write.table(
+    meta_table3,
+    con,
+    sep = "\t",
+    quote = F,
+    row.names = F
+)
+

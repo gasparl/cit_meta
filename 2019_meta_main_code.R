@@ -20,6 +20,7 @@ library(pROC)
 library(neatStats)
 library(esc)
 library("openxlsx")
+library("ggpubr")
 
 
 # Set working directory
@@ -28,6 +29,47 @@ setwd(path_neat())
 # set the functions
 source("2019_meta_functions.R")
 
+test_norm = function(to_test, dnumber, cndtn) {
+  dat_to_test = data.frame(myx = as.numeric(to_test))
+  densp = ggplot(dat_to_test, aes(x = myx)) +
+    geom_density(fill = "mediumseagreen", alpha = 0.1) +
+    ggtitle(paste0('Density Plot: Dataset ', dnumber, ' – ', cndtn)) +
+    xlab("Probe-Irrelevant differences (ms)") +
+    stat_function(
+      fun = function(x)
+        dnorm(x, mean = mean(dat_to_test$myx), sd = sd(dat_to_test$myx)),
+      color = "red",
+      linetype = "dotted",
+      size = 0.3
+    ) +
+    theme_bw() +
+    theme(text = element_text(family = "serif", size = 7),
+          plot.title = element_text(hjust = 0))
+  ggsave(
+    paste0('dataset_', dnumber, '_', cndtn, '_density_plot.tiff'), densp,
+    width = 5.9, height = 5.5,
+    units = 'cm',
+    path = path_neat('Figs_norm')
+  )
+  qqp = ggpubr::ggqqplot(dat_to_test$myx, color = '#3333ff', shape = 1) +
+    ggtitle(paste0('Q-Q Plot: Dataset ', dnumber, ' – ', cndtn)) +
+    ylab("Probe-Irrelevant differences (ms)") +
+    xlab('Normal theoretical quantile') +
+    theme_bw() +
+    theme(text = element_text(family = "serif", size = 7),
+          plot.title = element_text(hjust = 0))
+  qqp$layers[[2]]$aes_params$colour <- "red"
+  qqp$layers[[2]]$aes_params$linetype <- "dashed"
+  qqp$layers[[2]]$aes_params$size <- 0.3
+  ggsave(
+    paste0('dataset_', dnumber, '_', cndtn, '_qq_plot.tiff'), qqp,
+    width = 5.5, height = 5.5,
+    units = 'cm',
+    path = path_neat('Figs_norm')
+  )
+  print(shapiro.test(dat_to_test$myx))
+}
+
 ##### USING cit_meta_data_trial_level.Rda
 
 setwd(path_neat('data'))
@@ -35,14 +77,7 @@ load("cit_meta_data_trial_level.Rda")
 names(cit_meta_data_trial_level) = c('study', 'cond','multiple_single', 'id','block','dataset','trial','type','corr','rt','stim', 'isi','age','gender')
 Data_joined = cit_meta_data_trial_level
 
-temp1 = aggr_neat(Data_joined, 'trial', method = length, group_by = 'id')
-temp2 = aggr_neat(old, 'trial', method = length, group_by = c('id', 'dataset', 'cond'))
-setdiff(temp1, temp2)
-histogram(temp1$aggr_value)
-histogram(temp2$aggr_value)
-
-aggr_neat(temp1, 'aggr_group', method = length, group_by = 'aggr_value')
-aggr_neat(temp2, 'aggr_group', method = length, group_by = 'aggr_value')
+dsets = unique(Data_joined$dataset)
 
 # now we loop through the Data
 set.seed(100)
@@ -54,6 +89,7 @@ l_fig_sim = list()
 
 add_figs = TRUE # takes time
 add_figs = FALSE
+norm_tests = FALSE # saves plots, takes time
 
 for (i in dsets[order(nchar(dsets), dsets)]) {
     # i = "dataset 12"
@@ -124,9 +160,17 @@ for (i in dsets[order(nchar(dsets), dsets)]) {
   )
 
   p_i_guilty = filter(dat_i_prep, cond == 1)$p_vs_i
-  sd_i <- sd(p_i_guilty) * 0.51 + 7.08
-  # sd_i <- 0.894
-
+  
+  # average
+  sd_i <- sd(p_i_guilty) * 0.5186245 + 6.856039
+  # LOOCV
+  # sd_i <- sd(p_i_guilty) * formula_vals$coeffs[datnum] + formula_vals$consts[datnum]
+  if (norm_tests == TRUE) {
+    test_norm(p_i_guilty, datnum, 'Liar')
+    test_norm(filter(dat_i_prep, cond == 0)$p_vs_i, datnum, 'Control')
+  }
+  
+  
   # Get the cohens d and stuff
   eff_data <-
     effectsize_data(
@@ -186,15 +230,14 @@ for (i in dsets[order(nchar(dsets), dsets)]) {
 
 ## --- FIGURES
 
-library("ggpubr")
-fig_lists = c(l_fig_real, l_fig_sim)
-bigfig = ggpubr::ggarrange(plotlist = fig_lists, common.legend = TRUE, ncol = 12, nrow = 2, labels = c(paste(1:12, 'real'), paste(1:12, 'sim')), label.x = 0.17 )
-annotate_figure(
-    bigfig,
-    top = text_grob("Density plots per each dataset, real and simulated", face = "bold", size = 14),
-    bottom = text_grob("probe-irrelevant differences (ms)"),
-    left = text_grob("density estimate", rot = 90)
-)
+#fig_lists = c(l_fig_real, l_fig_sim)
+#bigfig = ggpubr::ggarrange(plotlist = fig_lists, common.legend = TRUE, ncol = 12, nrow = 2, labels = c(paste(1:12, 'real'), paste(1:12, 'sim')), label.x = 0.17 )
+#annotate_figure(
+#    bigfig,
+#    top = text_grob("Density plots per each dataset, real and simulated", face = "bold", size = 14),
+#    bottom = text_grob("probe-irrelevant differences (ms)"),
+#    left = text_grob("density estimate", rot = 90)
+#)
 
 
 ## --- Standard Deviations
@@ -215,22 +258,30 @@ i_sd_min = min(stat_dat$sd_i)
 
 # simulated standardized probe RT's SD mean: 0.894
 # t.test(stat_dat$sd_i, mu = 0.894)
+# ttestBF(stat_dat$sd_i - 0.894)
+# t_neat(stat_dat$sd_i, bayestestR::distribution_normal(9**5, mean = 0.894, sd = sd(stat_dat$sd_i)), bf_added = F)
 
 #stat_dat = stat_dat[stat_dat$dataset != 9, ]
-t_neat(stat_dat$sd_g, stat_dat$sd_i, pair = T, round_descr = 1)
-corr_neat(stat_dat$sd_g, stat_dat$sd_i)
-weights::wtd.cor(stat_dat$sd_g, stat_dat$sd_i, weight = (stat_dat$n_g+stat_dat$n_i))
+# t_neat(stat_dat$sd_g, stat_dat$sd_i, pair = T, round_descr = 1)
+# corr_neat(stat_dat$sd_g, stat_dat$sd_i)
+# corr_stat = weights::wtd.cor(stat_dat$sd_g, stat_dat$sd_i, weight = (stat_dat$n_g+stat_dat$n_i))
+# m_c = corr_stat[1]
+# se_c = corr_stat[2]
+# z_c = stats::qnorm(1 - (1 - 0.95) / 2)
+# dist = z_c * se_c
+# m_c - dist # low
+# m_c + dist # upp
+# m_c**2
 
 model = lm(sd_i~sd_g, data = stat_dat)
 summary(model)
+# unweighed: 0.4814 + 7.3228
+
 model = lm(sd_i~sd_g, data = stat_dat, weights = (stat_dat$n_g+stat_dat$n_i))
 summary(model)
-
+# weighted: 0.5186245 + 6.856039
 
 stat_dat$sd_sim2 = stat_dat$sd_g * model$coefficients[2] + model$coefficients[1]
-# weighted: 0.5112 + 7.0784
-# unweighed: 0.4528 + 8.1529
-#stat_dat$sd_sim2 = stat_dat$sd_g * 0.52479 +0.16970
 stat_dat$sd_sim3 = stat_dat$sd_g
 
 t_neat( stat_dat$sd_i, stat_dat$sd_sim2, pair = T )
@@ -244,19 +295,20 @@ ggplot(stat_dat, aes(
 )) +
     theme_bw() +
     geom_point(aes(y = stat_dat$sd_sim3), shape = 3,
-               size = 3) +
+               size = 3, color = "#009900") +
     geom_smooth(
         method = lm,
         fullrange = TRUE,
         level = .95,
-        color = "#111111",
+        color = "#bb0000",
+        fill = "#9999ff",
         size = 0.7
     ) +
     geom_point(
         aes(y = stat_dat$sd_sim2),
         shape = 16,
         size = 4,
-        color = "#FFFFFF"
+        color = "#ffffff"
     ) +
     geom_text(label = stat_dat$dataset,
               color = "#000000",
@@ -264,6 +316,26 @@ ggplot(stat_dat, aes(
     ylim(0, 50) +
     xlim(0, 50) + xlab("\nLiar data SD") + ylab("Control data SD\n") +
     theme(text = element_text(family = "serif", size = 15))
+
+### prep for LOOCV
+
+formula_vals = list(consts = c(), coeffs = c())
+for (dat_num in stat_dat$dataset) {
+  cat(dat_num, " ")
+  # print(model$coefficients)
+  dat_for_model = stat_dat[stat_dat$dataset != dat_num, ]
+  # dat_for_model = stat_dat[stat_dat$dataset != 8, ]
+  model = lm(
+    sd_i ~ sd_g,
+    data = dat_for_model,
+    weights = (dat_for_model$n_g + dat_for_model$n_i)
+  )
+  formula_vals$consts =  c(formula_vals$consts, as.numeric(model$coefficients[1]))
+  formula_vals$coeffs =  c(formula_vals$coeffs, as.numeric(model$coefficients[2]))
+}
+
+# formula_vals to be used in Loop
+
 
 # SD and mean diff
 
@@ -413,7 +485,7 @@ plot_neat(
         acc_type = c('TPs_', 'TNs_'),
         pred_type = c('p_vs_i_basic', 'p_vs_i_scaled_items', 'd_cit_pooled')
     ),
-    eb_method = sd,
+    eb_method = mean_ci, bar_colors = c('#cc0000','#b3b3ff'),
     type = "bar",
     panel = 'acc_type',
     factor_names = c(orig_vs_cv = 'Cutoff', pred_type = ''),
@@ -432,7 +504,6 @@ plot_neat(
     ".50" = 0.5,
     ".75" = 0.75
 ))
-
 
 anova_neat(
     accs_cv_wide,
@@ -560,9 +631,9 @@ fig_dat$Simulated[fig_dat$version == "simulated"] = 'Simulated'
 ggplot2::ggplot(data = fig_dat, aes(x = dataset,
                                     y = aucs,
                                     fill = Simulated)) +
-    geom_bar(stat = "identity",
+    geom_bar(stat = "identity", color = 'black',
              position = position_dodge(0.9)) +
-    scale_fill_manual(values = c('#AAAAAA', '#333333'), name = NULL) +
+    scale_fill_manual(values = c('#cc0000','#b3b3ff'), name = NULL) +
     geom_errorbar(aes(
         ymin = fig_dat$auc_lower,
         ymax = fig_dat$auc_upper,
@@ -576,7 +647,7 @@ ggplot2::ggplot(data = fig_dat, aes(x = dataset,
         ".50" = 0.5,
         ".75" = 0.75
     )) +
-    ylab("Area under the curve") + xlab("Dataset (individual experimental design)") +
+    ylab("Area under the curve") + xlab("Dataset number") +
     theme(
         panel.grid.major.y = element_line(color = "#d5d5d5"),
         panel.grid.minor.y = element_line(color = "#d5d5d5"),
@@ -654,6 +725,7 @@ anova(REML_multi, btt=2:3)
 anova(REML_multi, btt=4:5)
 anova(REML_multi, btt=3:4)
 
+
 forest(
     REML_multi,
     psize = 1,
@@ -724,7 +796,9 @@ t_neat(metdat$aucs[metdat$version == 'simulated'],
 
 corr_neat(metdat$aucs[metdat$version == "p_vs_i"], metdat$aucs[metdat$version == "simulated"])
 
-weights::wtd.cor(metdat$aucs[metdat$version == "p_vs_i"], metdat$aucs[metdat$version == "simulated"], weight = (sd_metdat$n_g[sd_metdat$version == "p_vs_i"]+sd_metdat$n_i[sd_metdat$version == "p_vs_i"]))
+weights::wtd.cor(metdat$aucs[metdat$version == "p_vs_i"],
+                 metdat$aucs[metdat$version == "simulated"],
+                 weight = (sd_metdat$n_g[sd_metdat$version == "p_vs_i"] + sd_metdat$n_i[sd_metdat$version == "p_vs_i"]))
 
 
 ## ROC

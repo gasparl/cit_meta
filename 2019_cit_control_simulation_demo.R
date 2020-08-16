@@ -7,7 +7,7 @@ liar_SD = 30.45
 
 # now, with the formula from the paper you can get the presumed control data SD for the simulation
 
-control_SD_sim = liar_SD * 0.5077 + 7.1245
+control_SD_sim = liar_SD * 0.52 + 6.86 # (more precisely 0.5186245 + 6.856039)
 
 # in the simplest case, base R gives the rnorm functions, that gives a random sample from normal distribution
 # this may be used simply as follows

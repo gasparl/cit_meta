@@ -45,8 +45,9 @@ calc_diffs_aucs = function(g_sd_lower,
     roc1 <<- t1$roc_obj
     fig1 = t1$density_plot +
         scale_x_continuous(limits = limits_x,
-                           breaks = seq(-50, 50, by = 50)) + scale_y_continuous(limits = limits_y)
-
+                           breaks = seq(-50, 50, by = 50)) + 
+        scale_y_continuous(limits = limits_y) + scale_fill_manual(name = NULL, values = c('#006600', '#b3b3ff'))
+    
     cat('\n2. Larger guilty-innocent difference but larger SDs:',
         fill = T)
     cat(
@@ -69,13 +70,16 @@ calc_diffs_aucs = function(g_sd_lower,
         reverse = T
     )
     roc2 <<- t2$roc_obj
-    fig2 = t2$density_plot  +    scale_x_continuous(limits = limits_x,
-                                                    breaks = seq(-50, 50, by = 50)) +  scale_y_continuous(limits = limits_y)
+    fig2 = t2$density_plot  +
+        scale_x_continuous(limits = limits_x,
+                           breaks = seq(-50, 50, by = 50)) +
+        scale_y_continuous(limits = limits_y) +
+        scale_fill_manual(name = NULL, values = c('#006600', '#b3b3ff'))
 
     cat('\nDifferences between two guilty groups:', fill = T)
     t_neat(g_1, g_2, bf_added = F)
 
-    show(annotate_figure(
+    show(ggpubr::annotate_figure(
         ggpubr::ggarrange(
             fig1,
             fig2,
@@ -87,7 +91,7 @@ calc_diffs_aucs = function(g_sd_lower,
             hjust = -0.9,
             vjust = 1
         ),
-        bottom = text_grob(
+        bottom = ggpubr::text_grob(
             "probe-irrelevant difference values",
             hjust = 0.4,
             vjust = 0.3,
@@ -98,6 +102,7 @@ calc_diffs_aucs = function(g_sd_lower,
     #fx1 <<- fig1
     #fx2 <<- fig2
 }
+
 
 # extremes:
 
@@ -121,17 +126,17 @@ calc_diffs_aucs(
 
 calc_diffs_aucs(
     g_sd_lower = 29.59950,
-    i_sd_lower = 20.73386,
+    i_sd_lower = 20.88514,
     g_sd_upper = 37.62754,
-    i_sd_upper = 26.01250,
+    i_sd_upper = 26.12452,
     m_g_diff = 20
 ) # second Fig
 
 calc_diffs_aucs(
     g_sd_lower = 29.59950,
-    i_sd_lower = 20.73386,
+    i_sd_lower = 20.88514,
     g_sd_upper = 37.62754,
-    i_sd_upper = 26.01250,
+    i_sd_upper = 26.12452,
     m_g_diff = 8 # 8 / 9
 )
 

@@ -242,27 +242,5 @@ names(cit_meta_data_trial_level) = c('study', 'cond','multiple_single', 'id','bl
 Data_joined = cit_meta_data_trial_level
 
 
-old <- readRDS("cit_meta_data_trial_level_OLD.rds")
-old = old[c('study', 'cond','multiple_single', 'id','block','dataset','trial','type','corr','rt','stim', 'isi','age','gender')]
-
-setdiff(Data_joined, old)
-
-
-
-cit_meta_data_trial_level = old
-cit_meta_data_trial_level = cit_meta_data_trial_level[c('study', 'cond','multiple_single', 'id','block','dataset','trial','type','corr','rt','stim', 'isi','age','gender')]
-names(cit_meta_data_trial_level) = c('study', 'condition','multiple_single', 'subject_id','block','dataset','trial','type','correct','rt','stimulus', 'isi','age','gender')
-
-cit_meta_data_trial_level$subject_id2 = paste0(cit_meta_data_trial_level$subject_id, cit_meta_data_trial_level$dataset, cit_meta_data_trial_level$condition, cit_meta_data_trial_level$multiple_single, cit_meta_data_trial_level$age)
-anon <- function(x) {
-    rl <- rle(x)$lengths
-    ans<- paste0("id", rep(seq_along(rl), rl))
-    return(ans)
-}
-cit_meta_data_trial_level$subject_id2 <- anon(cit_meta_data_trial_level$subject_id2)
-
-length(unique(paste(cit_meta_data_trial_level$dataset, cit_meta_data_trial_level$id, cit_meta_data_trial_level$age, cit_meta_data_trial_level$cond)))
-cit_meta_data_trial_level_probe = cit_meta_data_trial_level[cit_meta_data_trial_level$type == 'probe',]
-length(unique(paste(cit_meta_data_trial_level_probe$dataset, cit_meta_data_trial_level_probe$id, cit_meta_data_trial_level_probe$age, cit_meta_data_trial_level_probe$cond, cit_meta_data_trial_level_probe$id, cit_meta_data_trial_level_probe$stim)))
 
 
